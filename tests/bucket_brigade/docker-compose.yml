@@ -1,0 +1,77 @@
+services:
+  producer:
+    build: producer
+    ports:
+      - "8080:8080"
+
+  brigade1:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/producer/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8081:8080"
+
+  brigade2:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade1/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8082:8080"
+
+  brigade3:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade2/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8083:8080"
+
+  brigade4:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade3/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8084:8080"
+
+  brigade5:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade4/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8085:8080"
+
+  brigade6:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade5/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8086:8080"
+
+  brigade7:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade6/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8087:8080"
+
+  brigade8:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade7/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8088:8080"
+
+  brigade9:
+    build:
+      context: brigade
+      args:
+        PEER: /dnsaddr/brigade8/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+    ports:
+      - "8089:8080"
