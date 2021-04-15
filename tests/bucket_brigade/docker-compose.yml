@@ -1,77 +1,135 @@
-services:
+networks:
+  p2p:
+    name: p2p
   producer:
-    build: producer
+    name: producer
+  brigade1:
+    name: brigade1
+  brigade2:
+    name: brigade2
+
+services:
+  #producer
+  amqp-prod:
+    image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
+    networks:
+      - producer
+
+  jsonrpc-prod:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
+    networks:
+      - producer
     ports:
       - "8080:8080"
+    command: -a amqp://guest:guest@amqp-prod:5672/ -l /ip4/0.0.0.0/tcp/8888
 
-  brigade1:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/producer/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+  mempool-prod:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG}
+    networks:
+      - producer
+    command: -a amqp://guest:guest@amqp-prod:5672/
+
+  block-store-prod:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
+    networks:
+      - producer
+    command: -a amqp://guest:guest@amqp-prod:5672/
+
+  chain-prod:
+    image: koinos/koinos-chain:${CHAIN_TAG}
+    networks:
+      - producer
+    command: -a amqp://guest:guest@amqp-prod:5672/
+
+  p2p-prod:
+    image: koinos/koinos-p2p:${P2P_TAG}
+    networks:
+      - producer
+      - p2p
+    command: -a amqp://guest:guest@amqp-prod:5672/ -s bucket_brigade_producer
+
+  block-producer-prod:
+    networks:
+      - producer
+    image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG}
+    command: -a amqp://guest:guest@amqp-prod:5672/
+
+  #brigade1
+  amqp-brig1:
+    image: rabbitmq:alpine
+    networks:
+      - brigade1
+
+  jsonrpc-brig1:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
+    networks:
+      - brigade1
     ports:
       - "8081:8080"
+    command: -a amqp://guest:guest@amqp-brig1:5672/
 
-  brigade2:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade1/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
+  mempool-brig1:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG}
+    networks:
+      - brigade1
+    command: -a amqp://guest:guest@amqp-brig1:5672/
+
+  block-store-brig1:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
+    networks:
+      - brigade1
+    command: -a amqp://guest:guest@amqp-brig1:5672/
+
+  chain-brig1:
+    image: koinos/koinos-chain:${CHAIN_TAG}
+    networks:
+      - brigade1
+    command: -a amqp://guest:guest@amqp-brig1:5672/
+
+  p2p-brig1:
+    image: koinos/koinos-p2p:${P2P_TAG}
+    networks:
+      - brigade1
+      - p2p
+    command: -a amqp://guest:guest@amqp-brig1:5672/ -s bucket_brigade1 -l /ip4/0.0.0.0/tcp/8888 -p /dnsaddr/p2p-prod/tcp/8888/p2p/QmW7atAnmGJosd81c2u9ifnY45Yyy9owczaENQtaGeyoW8
+
+  #brigade2
+  amqp-brig2:
+    image: rabbitmq:alpine
+    networks:
+      - brigade2
+
+  jsonrpc-brig2:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
+    networks:
+      - brigade2
     ports:
       - "8082:8080"
+    command: -a amqp://guest:guest@amqp-brig2:5672/
 
-  brigade3:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade2/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8083:8080"
+  mempool-brig2:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG}
+    networks:
+      - brigade2
+    command: -a amqp://guest:guest@amqp-brig2:5672/
 
-  brigade4:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade3/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8084:8080"
+  block-store-brig2:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
+    networks:
+      - brigade2
+    command: -a amqp://guest:guest@amqp-brig2:5672/
 
-  brigade5:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade4/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8085:8080"
+  chain-brig2:
+    image: koinos/koinos-chain:${CHAIN_TAG}
+    networks:
+      - brigade2
+    command: -a amqp://guest:guest@amqp-brig2:5672/
 
-  brigade6:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade5/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8086:8080"
-
-  brigade7:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade6/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8087:8080"
-
-  brigade8:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade7/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8088:8080"
-
-  brigade9:
-    build:
-      context: brigade
-      args:
-        PEER: /dnsaddr/brigade8/tcp/8888/QmNPXiMGUFrjL2Q4XTxZDYjXUDpxy51Y4tenU8b7qBi9Rz
-    ports:
-      - "8089:8080"
+  p2p-brig2:
+    image: koinos/koinos-p2p:${P2P_TAG}
+    networks:
+      - brigade2
+      - p2p
+    command: -a amqp://guest:guest@amqp-brig2:5672/ -s bucket_brigade2 -l /ip4/0.0.0.0/tcp/8888 -p /dnsaddr/p2p-brig1/tcp/8888/p2p/QmXy4o4ejSjsMKzzrDpLMLjX9SkCuVBDi2vVKtT9VMZK7Q
