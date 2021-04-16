@@ -10,7 +10,7 @@ import (
 )
 
 func TestBucketBrigade(t *testing.T) {
-	timer := time.NewTimer(80 * time.Second)
+	timer := time.NewTimer(120 * time.Second)
 	go func() {
 		<-timer.C
 		t.Error("Timer expired")

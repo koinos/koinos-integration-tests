@@ -3,133 +3,157 @@ networks:
     name: p2p
   producer:
     name: producer
-  brigade1:
-    name: brigade1
-  brigade2:
-    name: brigade2
+  bucket1:
+    name: bucket1
+  bucket2:
+    name: bucket2
 
 services:
   #producer
-  amqp-prod:
+  amqp-producer:
     image: rabbitmq:alpine
-    ports:
-      - "5672:5672"
     networks:
       - producer
 
-  jsonrpc-prod:
+  jsonrpc-producer:
     image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
     networks:
       - producer
     ports:
       - "8080:8080"
-    command: -a amqp://guest:guest@amqp-prod:5672/ -l /ip4/0.0.0.0/tcp/8888
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/ -l /ip4/0.0.0.0/tcp/8080
 
-  mempool-prod:
+  mempool-producer:
     image: koinos/koinos-mempool:${MEMPOOL_TAG}
     networks:
       - producer
-    command: -a amqp://guest:guest@amqp-prod:5672/
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/
 
-  block-store-prod:
+  block-store-producer:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
     networks:
       - producer
-    command: -a amqp://guest:guest@amqp-prod:5672/
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/
 
-  chain-prod:
+  chain-producer:
     image: koinos/koinos-chain:${CHAIN_TAG}
     networks:
       - producer
-    command: -a amqp://guest:guest@amqp-prod:5672/
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/
 
-  p2p-prod:
+  p2p-producer:
     image: koinos/koinos-p2p:${P2P_TAG}
     networks:
-      - producer
       - p2p
-    command: -a amqp://guest:guest@amqp-prod:5672/ -s bucket_brigade_producer
-
-  block-producer-prod:
-    networks:
       - producer
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/ -s producer -l /ip4/0.0.0.0/tcp/8888
+
+  block-producer:
     image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG}
-    command: -a amqp://guest:guest@amqp-prod:5672/
+    networks:
+      - producer
+    depends_on:
+      - amqp-producer
+    command: -a amqp://guest:guest@amqp-producer:5672/
 
-  #brigade1
-  amqp-brig1:
+  #bucket1
+  amqp-bucket1:
     image: rabbitmq:alpine
     networks:
-      - brigade1
+      - bucket1
 
-  jsonrpc-brig1:
-    image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
-    networks:
-      - brigade1
-    ports:
-      - "8081:8080"
-    command: -a amqp://guest:guest@amqp-brig1:5672/
-
-  mempool-brig1:
+  mempool-bucket1:
     image: koinos/koinos-mempool:${MEMPOOL_TAG}
     networks:
-      - brigade1
-    command: -a amqp://guest:guest@amqp-brig1:5672/
+      - bucket1
+    depends_on:
+      - amqp-bucket1
+    command: -a amqp://guest:guest@amqp-bucket1:5672/
 
-  block-store-brig1:
+  block-store-bucket1:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
     networks:
-      - brigade1
-    command: -a amqp://guest:guest@amqp-brig1:5672/
+      - bucket1
+    depends_on:
+      - amqp-bucket1
+    command: -a amqp://guest:guest@amqp-bucket1:5672/
 
-  chain-brig1:
+  chain-bucket1:
     image: koinos/koinos-chain:${CHAIN_TAG}
     networks:
-      - brigade1
-    command: -a amqp://guest:guest@amqp-brig1:5672/
+      - bucket1
+    depends_on:
+      - amqp-bucket1
+    command: -a amqp://guest:guest@amqp-bucket1:5672/
 
-  p2p-brig1:
+  p2p-bucket1:
     image: koinos/koinos-p2p:${P2P_TAG}
     networks:
-      - brigade1
       - p2p
-    command: -a amqp://guest:guest@amqp-brig1:5672/ -s bucket_brigade1 -l /ip4/0.0.0.0/tcp/8888 -p /dnsaddr/p2p-prod/tcp/8888/p2p/QmW7atAnmGJosd81c2u9ifnY45Yyy9owczaENQtaGeyoW8
+      - bucket1
+    ports:
+      - "8888:8888"
+    depends_on:
+      - amqp-bucket1
+    command: -a amqp://guest:guest@amqp-bucket1:5672/ -s bucket1 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p-producer/tcp/8888/p2p/QmRT2UJ9uPqmcjCWoxgFZU3AsaMaMqmJ3DaEHeWZFLJp9L
 
-  #brigade2
-  amqp-brig2:
+  #bucket2
+  amqp-bucket2:
     image: rabbitmq:alpine
     networks:
-      - brigade2
+      - bucket2
+    ports:
+      - "5672:5672"
 
-  jsonrpc-brig2:
+  jsonrpc-bucket2:
     image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
     networks:
-      - brigade2
+      - bucket2
     ports:
       - "8082:8080"
-    command: -a amqp://guest:guest@amqp-brig2:5672/
+    depends_on:
+      - amqp-bucket2
+    command: -a amqp://guest:guest@amqp-bucket2:5672/ -l /tcp/8080
 
-  mempool-brig2:
+  mempool-bucket2:
     image: koinos/koinos-mempool:${MEMPOOL_TAG}
     networks:
-      - brigade2
-    command: -a amqp://guest:guest@amqp-brig2:5672/
+      - bucket2
+    depends_on:
+      - amqp-bucket2
+    command: -a amqp://guest:guest@amqp-bucket2:5672/
 
-  block-store-brig2:
+  block-store-bucket2:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
     networks:
-      - brigade2
-    command: -a amqp://guest:guest@amqp-brig2:5672/
+      - bucket2
+    depends_on:
+      - amqp-bucket2
+    command: -a amqp://guest:guest@amqp-bucket2:5672/
 
-  chain-brig2:
+  chain-bucket2:
     image: koinos/koinos-chain:${CHAIN_TAG}
     networks:
-      - brigade2
-    command: -a amqp://guest:guest@amqp-brig2:5672/
+      - bucket2
+    depends_on:
+      - amqp-bucket2
+    command: -a amqp://guest:guest@amqp-bucket2:5672/
 
-  p2p-brig2:
+  p2p-bucket2:
     image: koinos/koinos-p2p:${P2P_TAG}
     networks:
-      - brigade2
       - p2p
-    command: -a amqp://guest:guest@amqp-brig2:5672/ -s bucket_brigade2 -l /ip4/0.0.0.0/tcp/8888 -p /dnsaddr/p2p-brig1/tcp/8888/p2p/QmXy4o4ejSjsMKzzrDpLMLjX9SkCuVBDi2vVKtT9VMZK7Q
+      - bucket2
+    depends_on:
+      - amqp-bucket2
+    command: -a amqp://guest:guest@amqp-bucket2:5672/ -s bucket2 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p-bucket1/tcp/8888/p2p/QmcWYgujghF1oJhisxSTGYNjzPGVtejEL8XU41AqmEJsRB
