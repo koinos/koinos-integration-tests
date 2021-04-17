@@ -13,7 +13,7 @@ func TestBucketBrigade(t *testing.T) {
 	timer := time.NewTimer(120 * time.Second)
 	go func() {
 		<-timer.C
-		t.Error("Timer expired")
+		panic("Timer expired")
 	}()
 
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")

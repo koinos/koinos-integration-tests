@@ -14,7 +14,7 @@ func TestPublishTransaction(t *testing.T) {
 	timer := time.NewTimer(45 * time.Second)
 	go func() {
 		<-timer.C
-		t.Error("Timer expired")
+		panic("Timer expired")
 	}()
 
 	rpcClient := jsonrpc.NewClient("http://localhost:8080/")
