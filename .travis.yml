@@ -1,0 +1,15 @@
+language: go
+
+go:
+  - 1.x
+
+jobs:
+  include:
+    - os: linux
+      dist: focal
+
+install:
+  - ci/install.sh
+
+script:
+  - tests/run.sh
