@@ -3,27 +3,27 @@ services:
       image: rabbitmq:alpine
 
    jsonrpc:
-      image: koinos/koinos-jsonrpc:${JSONRPC_TAG}
+      image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
       ports:
          - "8080:8080"
       command: -a amqp://guest:guest@amqp:5672/ -l /tcp/8080 --log-level debug
 
    mempool:
-      image: koinos/koinos-mempool:${MEMPOOL_TAG}
+      image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/
 
-   block-store:
-      image: koinos/koinos-block-store:${BLOCK_STORE_TAG}
+   block_store:
+      image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/
 
    chain:
-      image: koinos/koinos-chain:${CHAIN_TAG}
+      image: koinos/koinos-chain:${CHAIN_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/
 
    p2p:
-      image: koinos/koinos-p2p:${P2P_TAG}
+      image: koinos/koinos-p2p:${P2P_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/ -s bucket_brigade
 
-   block-producer:
-      image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG}
+   block_producer:
+      image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/
