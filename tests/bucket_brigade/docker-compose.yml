@@ -33,7 +33,7 @@ services:
       - amqp_producer
     command: -a amqp://guest:guest@amqp_producer:5672/
 
-  block-store_producer:
+  block_store_producer:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
     networks:
       - producer
@@ -80,7 +80,7 @@ services:
       - amqp_bucket1
     command: -a amqp://guest:guest@amqp_bucket1:5672/
 
-  block-store_bucket1:
+  block_store_bucket1:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
     networks:
       - bucket1
@@ -134,7 +134,7 @@ services:
       - amqp_bucket2
     command: -a amqp://guest:guest@amqp_bucket2:5672/
 
-  block-store_bucket2:
+  block_store_bucket2:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
     networks:
       - bucket2
