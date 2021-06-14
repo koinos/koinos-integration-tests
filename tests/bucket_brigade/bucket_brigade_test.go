@@ -73,7 +73,7 @@ func TestBucketBrigade(t *testing.T) {
 				t.Error(err)
 			}
 
-			log.Printf("Bucket2 Height %d", headInfoResponse.HeadTopology.Height)
+			log.Printf("Bucket2 Height %d", endHeadInfoResponse.HeadTopology.Height)
 
 			if endHeadInfoResponse.HeadTopology.Height >= headInfoResponse.HeadTopology.Height {
 				break
