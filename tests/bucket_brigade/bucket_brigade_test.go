@@ -2,6 +2,7 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"log"
 	"testing"
 	"time"
 
@@ -36,6 +37,8 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
+	log.Print("Starting test...")
+
 	test_timer := time.NewTimer(120 * time.Second)
 	go func() {
 		<-test_timer.C
@@ -49,6 +52,8 @@ func TestBucketBrigade(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+
+			log.Printf("Producer Height %d", headInfoResponse.HeadTopology.Height)
 
 			if headInfoResponse.HeadTopology.Height > 5 {
 				break
@@ -67,6 +72,8 @@ func TestBucketBrigade(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+
+			log.Printf("Bucket2 Height %d", headInfoResponse.HeadTopology.Height)
 
 			if endHeadInfoResponse.HeadTopology.Height >= headInfoResponse.HeadTopology.Height {
 				break
