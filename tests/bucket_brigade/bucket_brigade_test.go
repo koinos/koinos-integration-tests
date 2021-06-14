@@ -2,6 +2,7 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"log"
 	"testing"
 	"time"
 
@@ -10,16 +11,39 @@ import (
 )
 
 func TestBucketBrigade(t *testing.T) {
-	timer := time.NewTimer(120 * time.Second)
+	kill_timer := time.NewTimer(10 * time.Minute)
 	go func() {
-		<-timer.C
+		<-kill_timer.C
 		panic("Timer expired")
 	}()
 
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")
+	endClient := jsonrpc.NewClient("http://localhost:8082/")
 
 	headInfoRequest := types.GetHeadInfoRequest{}
 	headInfoResponse := types.GetHeadInfoResponse{}
+
+	for {
+		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
+		if err == nil && response.Error == nil {
+			err := response.GetObject(&headInfoResponse)
+			if err != nil {
+				t.Error(err)
+			}
+
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	log.Print("Starting test...")
+
+	test_timer := time.NewTimer(120 * time.Second)
+	go func() {
+		<-test_timer.C
+		panic("Timer expired")
+	}()
 
 	for {
 		response, err := producerClient.Call("chain.get_head_info", headInfoRequest)
@@ -28,6 +52,8 @@ func TestBucketBrigade(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+
+			log.Printf("Producer Height %d", headInfoResponse.HeadTopology.Height)
 
 			if headInfoResponse.HeadTopology.Height > 5 {
 				break
@@ -39,7 +65,6 @@ func TestBucketBrigade(t *testing.T) {
 
 	endHeadInfoResponse := types.GetHeadInfoResponse{}
 
-	endClient := jsonrpc.NewClient("http://localhost:8082/")
 	for {
 		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
 		if err == nil && response.Error == nil {
@@ -47,6 +72,8 @@ func TestBucketBrigade(t *testing.T) {
 			if err != nil {
 				t.Error(err)
 			}
+
+			log.Printf("Bucket2 Height %d", endHeadInfoResponse.HeadTopology.Height)
 
 			if endHeadInfoResponse.HeadTopology.Height >= headInfoResponse.HeadTopology.Height {
 				break

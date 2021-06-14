@@ -11,9 +11,9 @@ import (
 )
 
 func TestPublishTransaction(t *testing.T) {
-	timer := time.NewTimer(45 * time.Second)
+	kill_timer := time.NewTimer(10 * time.Minute)
 	go func() {
-		<-timer.C
+		<-kill_timer.C
 		panic("Timer expired")
 	}()
 
@@ -21,6 +21,26 @@ func TestPublishTransaction(t *testing.T) {
 
 	headInfoRequest := types.GetHeadInfoRequest{}
 	headInfoResponse := types.GetHeadInfoResponse{}
+
+	for {
+		response, err := rpcClient.Call("chain.get_head_info", headInfoRequest)
+		if err == nil && response.Error == nil {
+			err := response.GetObject(&headInfoResponse)
+			if err != nil {
+				t.Error(err)
+			}
+
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	test_timer := time.NewTimer(45 * time.Second)
+	go func() {
+		<-test_timer.C
+		panic("Timer expired")
+	}()
 
 	for {
 		response, err := rpcClient.Call("chain.get_head_info", headInfoRequest)
