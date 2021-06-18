@@ -18,4 +18,4 @@ function run_tests() {
    return $success
 }
 
-run_tests
+#run_tests
