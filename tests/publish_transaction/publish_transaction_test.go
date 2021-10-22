@@ -2,11 +2,15 @@ package publishTransaction
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
 
-	types "github.com/koinos/koinos-types-golang"
+	kjson "github.com/koinos/koinos-proto-golang/koinos/json"
+	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
 
@@ -19,13 +23,18 @@ func TestPublishTransaction(t *testing.T) {
 
 	rpcClient := jsonrpc.NewClient("http://localhost:8080/")
 
-	headInfoRequest := types.GetHeadInfoRequest{}
-	headInfoResponse := types.GetHeadInfoResponse{}
+	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := rpcClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -43,9 +52,15 @@ func TestPublishTransaction(t *testing.T) {
 	}()
 
 	for {
-		response, err := rpcClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -60,15 +75,19 @@ func TestPublishTransaction(t *testing.T) {
 
 	startingBlock := headInfoResponse.HeadTopology.Height
 
-	submitTrxRequest := types.SubmitTransactionRequest{}
-	submitTrxJSON := "{\"transaction\":{\"active_data\":{\"nonce\":0,\"operations\":[{\"type\":\"koinos::protocol::create_system_contract_operation\",\"value\":{\"bytecode\":\"z1V7mJPthM7N8fStfyib4zG6P8UZ3XxRu79LBUdyYUJFZMCD6LVbDSXVBYhqAF8gsGzW9EQTZ6P9ubXcLwzc76ouXrLY8jmWTfVe83a1xBVaKgLsKjtYMnxFvN9AdgEGumoERZoyZC7XFxo97pvdCKvfHGpESu9kSFMB5MVpPxJYfRbgCPyPNwLNU2KijTpiNyqksr1t7EbwyFZNxZNvECDi3qahqLb2R28tksichZZnoEJatWca4pJhVEtkSeR82TzgGWzunbTLikHVcFGofXBrdFXNaxQbMaMtWWYxVuroUTAEXTYMS1Akk3nsDHYeXp6EV365AhZS8Bgbbk2VBVC9o4xL7UE9nokewSKbWKZUkg6nRmQJUwpyWMwY6T8rvHNat7S94XBL5mGqKSEjWNDcztVmqrAqVigLsjqtV3dRt5Fg45CgbV97GnNTyPTBpD38L3dnkFEBi6C2Gc6CPG4U2xRtCnMr7HqT9kajrw1oUirfZio1ejoAtDNCCG3hef9kUqMjgKujU44gdSHACqJ9iKwGPj9b5EcfpuPZF17E1yat1xAkphxAfcRo2bH9aW6zQYfhLVD32jVx54NXRekFkzGBPZxtxMroP48tyxiKTRF9zWC2U6DjW4rvxGJZtocvFamjKwjCqrRMofdPuRcZ4h27zfREdac9hAZ7ik9brHEe4byQ6SuVkBpPqnsoigf6hu818QidHKuu3BcxLJSjk3BwvPDnDu5W35x7roYpQVGQH6nPSWWkDqGxXebY5L3w7orP3YU\",\"contract_id\":\"z3iBzP4BjB1QMXCM9yNWJGdPAP1Ar\",\"extensions\":{}}}],\"resource_limit\":1},\"id\":\"zQmWEeUp1FqmhVB8LUbDexcxduet7ZGAe7XKM4a7u39bgwE\",\"passive_data\":{},\"signature_data\":\"z3k9YmtYJr3BPFwHygjjmAHCcc8zGhu8c4jo1vweM8UYjiKxX9pumG2ftaspvaduYFtDwE3zS8zYaQyNqEGdud41Ro\"},\"verify_passive_data\":true,\"verify_transaction_signatures\":true}"
+	id, _ := hex.DecodeString("122076547abc9c854b5f215963bba62fac78e8c6ab9f2a0977fb3e7b60eb00c6ed51")
+	activeData, _ := hex.DecodeString("08c0843d")
+	sigData, _ := hex.DecodeString("1f0e51b5a9bdb8febe16a567b97526d1923fd6b37fabd4f875de2cadd5ff37d941362753bd02c7a9168666df674d4efe4e6de356dae0cd049513b2f5528700c6c1")
 
-	err := json.Unmarshal([]byte(submitTrxJSON), &submitTrxRequest)
-	if err != nil {
-		t.Error(err)
-	}
+	submitTrxRequest := chain.SubmitTransactionRequest{}
+	submitTrxRequest.Transaction = &protocol.Transaction{}
+	submitTrxRequest.Transaction.Id = id
+	submitTrxRequest.Transaction.Active = activeData
+	submitTrxRequest.Transaction.SignatureData = sigData
 
-	response, err := rpcClient.Call("chain.submit_transaction", &submitTrxRequest)
+	submitJSON, _ := kjson.Marshal(&submitTrxRequest)
+
+	response, err := rpcClient.Call("chain.submit_transaction", json.RawMessage(submitJSON))
 	if err != nil {
 		t.Error(err)
 	}
@@ -80,13 +99,15 @@ func TestPublishTransaction(t *testing.T) {
 	currentHeight := headInfoResponse.HeadTopology.Height
 
 	for currentHeight <= startingBlock {
-		response, err := rpcClient.Call("chain.get_head_info", &headInfoRequest)
+		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil {
-			if response.Error != nil {
-				t.Error(response.Error)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
 			}
 
-			err := response.GetObject(&headInfoResponse)
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -97,16 +118,16 @@ func TestPublishTransaction(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	getBlocksByHeightRequest := types.GetBlocksByHeightRequest{
-		HeadBlockID:         headInfoResponse.HeadTopology.ID,
+	getBlocksByHeightRequest := block_store.GetBlocksByHeightRequest{
+		HeadBlockId:         headInfoResponse.HeadTopology.Id,
 		AncestorStartHeight: startingBlock + 1,
 		NumBlocks:           1,
 		ReturnBlock:         true,
 		ReturnReceipt:       false,
 	}
-	getBlocksByHeightResponse := types.GetBlocksByHeightResponse{}
+	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
 
-	response, err = rpcClient.Call("block_store.get_blocks_by_height", &getBlocksByHeightRequest)
+	response, err = rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
 		t.Error(err)
 	}
@@ -115,12 +136,19 @@ func TestPublishTransaction(t *testing.T) {
 		t.Error(response.Error)
 	}
 
-	err = response.GetObject(&getBlocksByHeightResponse)
+	getBlocksByHeightResponse := &block_store.GetBlocksByHeightResponse{}
+	raw := json.RawMessage{}
+	err = response.GetObject(&raw)
 	if err != nil {
 		t.Error(err)
 	}
 
-	if len(getBlocksByHeightResponse.BlockItems) != 1 {
+	err = kjson.Unmarshal([]byte(raw), getBlocksByHeightResponse)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if getBlocksByHeightResponse.BlockItems == nil || len(getBlocksByHeightResponse.BlockItems) != 1 {
 		t.Errorf("Expected 1 block item, was %v", len(getBlocksByHeightResponse.BlockItems))
 	}
 
@@ -130,36 +158,25 @@ func TestPublishTransaction(t *testing.T) {
 		t.Errorf("Expected block %v, was %v", startingBlock+1, blockItem.BlockHeight)
 	}
 
-	blockItem.Block.Unbox()
-	if blockItem.Block.IsBoxed() {
-		t.Error("Could not unbox returned block")
+	if blockItem.Block == nil {
+		t.Errorf("Block was unexpectedly null")
 	}
 
-	block, err := blockItem.Block.GetNative()
-	if err != nil {
-		t.Error(err)
+	if len(blockItem.Block.Transactions) != 1 {
+		t.Errorf("Expected 1 transaction, was %v", len(blockItem.Block.Transactions))
 	}
 
-	if len(block.Transactions) != 1 {
-		t.Errorf("Expected 1 transaction, was %v", len(block.Transactions))
+	trx := blockItem.Block.Transactions[0]
+
+	if bytes.Compare(trx.Id, id) != 0 {
+		t.Errorf("Unexpected transaction id")
 	}
 
-	trx := block.Transactions[0]
-
-	b, _ := json.Marshal(trx.ID)
-	if bytes.Compare(b, []byte("zQmWEeUp1FqmhVB8LUbDexcxduet7ZGAe7XKM4a7u39bgwE")) == 0 {
-		t.Errorf("Unexpected transaction id, %v", string(b))
+	if bytes.Compare(trx.SignatureData, sigData) != 0 {
+		t.Errorf("Unexpected transaction signature")
 	}
 
-	b, _ = json.Marshal(trx.SignatureData)
-	if bytes.Compare(b, []byte("z3k9YmtYJr3BPFwHygjjmAHCcc8zGhu8c4jo1vweM8UYjiKxX9pumG2ftaspvaduYFtDwE3zS8zYaQyNqEGdud41Ro")) == 0 {
-		t.Errorf("Unexpected transaction signature, %v", string(b))
+	if bytes.Compare(trx.Active, activeData) != 0 {
+		t.Errorf("Unexpected transaction active data")
 	}
-
-	trx.ActiveData.Unbox()
-	if trx.ActiveData.IsBoxed() {
-		t.Errorf("Could not unbox transaction active data")
-	}
-
-	// We could check contents of Active Data, but this should be sufficient for an integration test
 }

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	types "github.com/koinos/koinos-types-golang"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
 
@@ -20,11 +20,10 @@ func TestBucketBrigade(t *testing.T) {
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")
 	endClient := jsonrpc.NewClient("http://localhost:8082/")
 
-	headInfoRequest := types.GetHeadInfoRequest{}
-	headInfoResponse := types.GetHeadInfoResponse{}
+	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := endClient.Call("chain.get_head_info")
 		if err == nil && response.Error == nil {
 			err := response.GetObject(&headInfoResponse)
 			if err != nil {
@@ -46,7 +45,7 @@ func TestBucketBrigade(t *testing.T) {
 	}()
 
 	for {
-		response, err := producerClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := producerClient.Call("chain.get_head_info")
 		if err == nil && response.Error == nil {
 			err := response.GetObject(&headInfoResponse)
 			if err != nil {
@@ -63,10 +62,10 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	endHeadInfoResponse := types.GetHeadInfoResponse{}
+	endHeadInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := endClient.Call("chain.get_head_info")
 		if err == nil && response.Error == nil {
 			err := response.GetObject(&endHeadInfoResponse)
 			if err != nil {
@@ -83,7 +82,7 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	if bytes.Compare(headInfoResponse.HeadTopology.ID.Digest, endHeadInfoResponse.HeadTopology.ID.Digest) != 0 || headInfoResponse.HeadTopology.ID.ID != endHeadInfoResponse.HeadTopology.ID.ID {
+	if bytes.Compare([]byte(headInfoResponse.HeadTopology.Id), []byte(endHeadInfoResponse.HeadTopology.Id)) != 0 {
 		t.Error("Head block IDs do not match")
 	}
 }
