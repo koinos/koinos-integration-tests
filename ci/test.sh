@@ -1,5 +1,3 @@
 echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
 
-pwd
-
-../tests/run.sh
+$TRAVIS_BUILD_DIR/tests/run.sh
