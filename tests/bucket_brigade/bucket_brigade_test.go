@@ -9,6 +9,7 @@ import (
 	"time"
 
 	kjson "github.com/koinos/koinos-proto-golang/koinos/json"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
@@ -105,7 +106,44 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	if bytes.Compare(headInfoResponse.HeadTopology.Id, endHeadInfoResponse.HeadTopology.Id) != 0 {
-		t.Errorf("Head block IDs do not match, (%s, %s)", hex.EncodeToString(headInfoResponse.HeadTopology.Id), hex.EncodeToString(endHeadInfoResponse.HeadTopology.Id))
+	getBlocksByHeightRequest := block_store.GetBlocksByHeightRequest{
+		HeadBlockId:         headInfoResponse.HeadTopology.Id,
+		AncestorStartHeight: headInfoResponse.HeadTopology.Height,
+		NumBlocks:           1,
+		ReturnBlock:         false,
+		ReturnReceipt:       false,
+	}
+
+	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
+
+	response, err := endClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
+	if err != nil {
+		t.Error(err)
+	}
+
+	if response.Error != nil {
+		t.Error(response.Error)
+	}
+
+	getBlocksByHeightResponse := &block_store.GetBlocksByHeightResponse{}
+	raw := json.RawMessage{}
+	err = response.GetObject(&raw)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = kjson.Unmarshal([]byte(raw), getBlocksByHeightResponse)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if getBlocksByHeightResponse.BlockItems == nil || len(getBlocksByHeightResponse.BlockItems) != 1 {
+		t.Errorf("Expected 1 block item, was %v", len(getBlocksByHeightResponse.BlockItems))
+	}
+
+	blockItem := getBlocksByHeightResponse.BlockItems[0]
+
+	if bytes.Compare(headInfoResponse.HeadTopology.Id, blockItem.BlockId) != 0 {
+		t.Errorf("Head block IDs do not match, (%s, %s)", hex.EncodeToString(headInfoResponse.HeadTopology.Id), hex.EncodeToString(blockItem.BlockId))
 	}
 }
