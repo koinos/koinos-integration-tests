@@ -8,6 +8,11 @@ networks:
   bucket2:
     name: bucket2
 
+volumes:
+  producer_volume:
+  bucket1_volume:
+  bucket2_volume:
+
 services:
   #producer
   amqp_producer:
@@ -15,14 +20,23 @@ services:
     networks:
       - producer
 
+  producer_config:
+    build:
+      context: ../../node-config
+    volumes:
+      - producer_volume:/koinos
+
   jsonrpc_producer:
     image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
     networks:
       - producer
     ports:
       - "8080:8080"
+    volumes:
+         - producer_volume:/root/.koinos
     depends_on:
       - amqp_producer
+      - producer_config
     command: -a amqp://guest:guest@amqp_producer:5672/ -l /ip4/0.0.0.0/tcp/8080
 
   mempool_producer:
@@ -45,8 +59,11 @@ services:
     image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     networks:
       - producer
+    volumes:
+      - producer_volume:/root/.koinos
     depends_on:
       - amqp_producer
+      - producer_config
     command: -a amqp://guest:guest@amqp_producer:5672/
 
   p2p_producer:
@@ -62,15 +79,24 @@ services:
     image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
     networks:
       - producer
+    volumes:
+      - producer_volume:/root/.koinos
     depends_on:
       - amqp_producer
-    command: -a amqp://guest:guest@amqp_producer:5672/
+      - producer_config
+    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --stale-production-threshold=-1
 
   #bucket1
   amqp_bucket1:
     image: rabbitmq:alpine
     networks:
       - bucket1
+
+  bucket1_config:
+    build:
+      context: ../../node-config
+    volumes:
+      - bucket1_volume:/koinos
 
   mempool_bucket1:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
@@ -92,8 +118,11 @@ services:
     image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     networks:
       - bucket1
+    volumes:
+      - bucket1_volume:/root/.koinos
     depends_on:
       - amqp_bucket1
+      - bucket1_config
     command: -a amqp://guest:guest@amqp_bucket1:5672/
 
   p2p_bucket1:
@@ -116,14 +145,23 @@ services:
     ports:
       - "5672:5672"
 
+  bucket2_config:
+    build:
+      context: ../../node-config
+    volumes:
+      - bucket2_volume:/koinos
+
   jsonrpc_bucket2:
     image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
     networks:
       - bucket2
     ports:
       - "8082:8080"
+    volumes:
+      - bucket2_volume:/root/.koinos
     depends_on:
       - amqp_bucket2
+      - bucket2_config
     command: -a amqp://guest:guest@amqp_bucket2:5672/ -l /tcp/8080
 
   mempool_bucket2:
@@ -146,8 +184,11 @@ services:
     image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     networks:
       - bucket2
+    volumes:
+      - bucket2_volume:/root/.koinos
     depends_on:
       - amqp_bucket2
+      - bucket2_config
     command: -a amqp://guest:guest@amqp_bucket2:5672/
 
   p2p_bucket2:

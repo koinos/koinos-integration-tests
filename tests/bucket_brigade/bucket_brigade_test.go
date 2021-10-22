@@ -2,11 +2,15 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"encoding/hex"
+	"encoding/json"
 	"log"
 	"testing"
 	"time"
 
-	types "github.com/koinos/koinos-types-golang"
+	kjson "github.com/koinos/koinos-proto-golang/koinos/json"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
 
@@ -20,13 +24,18 @@ func TestBucketBrigade(t *testing.T) {
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")
 	endClient := jsonrpc.NewClient("http://localhost:8082/")
 
-	headInfoRequest := types.GetHeadInfoRequest{}
-	headInfoResponse := types.GetHeadInfoResponse{}
+	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -46,9 +55,15 @@ func TestBucketBrigade(t *testing.T) {
 	}()
 
 	for {
-		response, err := producerClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := producerClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -63,12 +78,18 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	endHeadInfoResponse := types.GetHeadInfoResponse{}
+	endHeadInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", headInfoRequest)
+		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&endHeadInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &endHeadInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -83,7 +104,44 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	if bytes.Compare(headInfoResponse.HeadTopology.ID.Digest, endHeadInfoResponse.HeadTopology.ID.Digest) != 0 || headInfoResponse.HeadTopology.ID.ID != endHeadInfoResponse.HeadTopology.ID.ID {
-		t.Error("Head block IDs do not match")
+	getBlocksByHeightRequest := block_store.GetBlocksByHeightRequest{
+		HeadBlockId:         headInfoResponse.HeadTopology.Id,
+		AncestorStartHeight: headInfoResponse.HeadTopology.Height,
+		NumBlocks:           1,
+		ReturnBlock:         false,
+		ReturnReceipt:       false,
+	}
+
+	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
+
+	response, err := endClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
+	if err != nil {
+		t.Error(err)
+	}
+
+	if response.Error != nil {
+		t.Error(response.Error)
+	}
+
+	getBlocksByHeightResponse := &block_store.GetBlocksByHeightResponse{}
+	raw := json.RawMessage{}
+	err = response.GetObject(&raw)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = kjson.Unmarshal([]byte(raw), getBlocksByHeightResponse)
+	if err != nil {
+		t.Error(err)
+	}
+
+	if getBlocksByHeightResponse.BlockItems == nil || len(getBlocksByHeightResponse.BlockItems) != 1 {
+		t.Errorf("Expected 1 block item, was %v", len(getBlocksByHeightResponse.BlockItems))
+	}
+
+	blockItem := getBlocksByHeightResponse.BlockItems[0]
+
+	if bytes.Compare(headInfoResponse.HeadTopology.Id, blockItem.BlockId) != 0 {
+		t.Errorf("Head block IDs do not match, (%s, %s)", hex.EncodeToString(headInfoResponse.HeadTopology.Id), hex.EncodeToString(blockItem.BlockId))
 	}
 }
