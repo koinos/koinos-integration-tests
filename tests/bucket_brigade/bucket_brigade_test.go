@@ -2,10 +2,12 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"encoding/json"
 	"log"
 	"testing"
 	"time"
 
+	kjson "github.com/koinos/koinos-proto-golang/koinos/json"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
@@ -23,9 +25,15 @@ func TestBucketBrigade(t *testing.T) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info")
+		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
+			if err != nil {
+				t.Error(err)
+			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
 			if err != nil {
 				t.Error(err)
 			}
@@ -45,12 +53,20 @@ func TestBucketBrigade(t *testing.T) {
 	}()
 
 	for {
-		response, err := producerClient.Call("chain.get_head_info")
+		response, err := producerClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&headInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
 			if err != nil {
 				t.Error(err)
 			}
+
+			err = kjson.Unmarshal([]byte(raw), &headInfoResponse)
+			if err != nil {
+				t.Error(err)
+			}
+
+			break
 
 			log.Printf("Producer Height %d", headInfoResponse.HeadTopology.Height)
 
@@ -65,12 +81,20 @@ func TestBucketBrigade(t *testing.T) {
 	endHeadInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info")
+		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
-			err := response.GetObject(&endHeadInfoResponse)
+			raw := json.RawMessage{}
+			err := response.GetObject(&raw)
 			if err != nil {
 				t.Error(err)
 			}
+
+			err = kjson.Unmarshal([]byte(raw), &endHeadInfoResponse)
+			if err != nil {
+				t.Error(err)
+			}
+
+			break
 
 			log.Printf("Bucket2 Height %d", endHeadInfoResponse.HeadTopology.Height)
 
@@ -82,7 +106,7 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	if bytes.Compare([]byte(headInfoResponse.HeadTopology.Id), []byte(endHeadInfoResponse.HeadTopology.Id)) != 0 {
+	if bytes.Compare(headInfoResponse.HeadTopology.Id, endHeadInfoResponse.HeadTopology.Id) != 0 {
 		t.Error("Head block IDs do not match")
 	}
 }
