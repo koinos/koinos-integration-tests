@@ -2,6 +2,7 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"log"
 	"testing"
@@ -107,6 +108,6 @@ func TestBucketBrigade(t *testing.T) {
 	}
 
 	if bytes.Compare(headInfoResponse.HeadTopology.Id, endHeadInfoResponse.HeadTopology.Id) != 0 {
-		t.Error("Head block IDs do not match")
+		t.Errorf("Head block IDs do not match, (%s, %s)", hex.EncodeToString(headInfoResponse.HeadTopology.Id), hex.EncodeToString(endHeadInfoResponse.HeadTopology.Id))
 	}
 }
