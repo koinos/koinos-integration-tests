@@ -2,15 +2,16 @@ package publishTransaction
 
 import (
 	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"testing"
 	"time"
 
-	kjson "github.com/koinos/koinos-proto-golang/koinos/json"
+	kjson "github.com/koinos/koinos-proto-golang/encoding/json"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	util "github.com/koinos/koinos-util-golang"
+	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	jsonrpc "github.com/ybbus/jsonrpc/v2"
 )
 
@@ -75,25 +76,26 @@ func TestPublishTransaction(t *testing.T) {
 
 	startingBlock := headInfoResponse.HeadTopology.Height
 
-	id, _ := hex.DecodeString("122076547abc9c854b5f215963bba62fac78e8c6ab9f2a0977fb3e7b60eb00c6ed51")
-	activeData, _ := hex.DecodeString("08c0843d")
-	sigData, _ := hex.DecodeString("1f0e51b5a9bdb8febe16a567b97526d1923fd6b37fabd4f875de2cadd5ff37d941362753bd02c7a9168666df674d4efe4e6de356dae0cd049513b2f5528700c6c1")
-
-	submitTrxRequest := chain.SubmitTransactionRequest{}
-	submitTrxRequest.Transaction = &protocol.Transaction{}
-	submitTrxRequest.Transaction.Id = id
-	submitTrxRequest.Transaction.Active = activeData
-	submitTrxRequest.Transaction.SignatureData = sigData
-
-	submitJSON, _ := kjson.Marshal(&submitTrxRequest)
-
-	response, err := rpcClient.Call("chain.submit_transaction", json.RawMessage(submitJSON))
+	key, err := util.GenerateKoinosKey()
 	if err != nil {
 		t.Error(err)
 	}
 
-	if response.Error != nil {
-		t.Error(response.Error)
+	krpc := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+
+	ops := make([]*protocol.Operation, 1)
+	ops[0] = &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &protocol.UploadContractOperation{
+				ContractId: key.AddressBytes(),
+			},
+		},
+	}
+
+	id, err := krpc.SubmitTransaction(ops, key)
+
+	if err != nil {
+		t.Error(err)
 	}
 
 	currentHeight := headInfoResponse.HeadTopology.Height
@@ -127,7 +129,7 @@ func TestPublishTransaction(t *testing.T) {
 	}
 	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
 
-	response, err = rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
+	response, err := rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
 		t.Error(err)
 	}
@@ -170,13 +172,5 @@ func TestPublishTransaction(t *testing.T) {
 
 	if bytes.Compare(trx.Id, id) != 0 {
 		t.Errorf("Unexpected transaction id")
-	}
-
-	if bytes.Compare(trx.SignatureData, sigData) != 0 {
-		t.Errorf("Unexpected transaction signature")
-	}
-
-	if bytes.Compare(trx.Active, activeData) != 0 {
-		t.Errorf("Unexpected transaction active data")
 	}
 }
