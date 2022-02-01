@@ -5,8 +5,8 @@ go 1.15
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/koinos/koinos-cli v0.1.3-0.20211222205303-25d9647b3c29 // indirect
-	github.com/koinos/koinos-proto-golang v0.2.1-0.20211223221426-6213a3ada193
-	github.com/koinos/koinos-util-golang v0.0.0-20220104191546-d98cd23b0404
+	github.com/koinos/koinos-proto-golang v0.2.1-0.20220130223809-646e1326d425
+	github.com/koinos/koinos-util-golang v0.0.0-20220131212950-564048fde689
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/multiformats/go-multihash v0.1.0 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
