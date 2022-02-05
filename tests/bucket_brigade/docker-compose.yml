@@ -84,7 +84,7 @@ services:
     depends_on:
       - amqp_producer
       - producer_config
-    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --stale-production-threshold=-1
+    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --gossip-production=false
 
   #bucket1
   amqp_bucket1:
