@@ -18,5 +18,6 @@ function run_tests() {
    return $success
 }
 
-run_tests
-exit $?
+retval=run_tests
+echo $retval
+exit $retval
