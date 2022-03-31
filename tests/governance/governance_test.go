@@ -15,9 +15,9 @@ import (
 )
 
 func TestGovernance(t *testing.T) {
-	kill_timer := time.NewTimer(10 * time.Minute)
+	killTimer := time.NewTimer(10 * time.Minute)
 	go func() {
-		<-kill_timer.C
+		<-killTimer.C
 		panic("Timer expired")
 	}()
 

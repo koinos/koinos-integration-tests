@@ -1,15 +1,21 @@
-
 #!/bin/bash
 
 function run_tests() {
-   success=0
+   local success=0
+
    for test_dir in */ ; do
       pushd $test_dir
       go build ./...
       docker-compose up -d
-      success=$?||$success
+      if [ $? -ne 0 ] || [ $success -ne 0 ];
+      then
+        success=1
+      fi
       go test -v ./...
-      success=$?||$success
+      if [ $? -ne 0 ] || [ $success -ne 0 ];
+      then
+        success=1
+      fi
       docker-compose logs
       docker-compose down
       popd
@@ -19,6 +25,5 @@ function run_tests() {
 }
 
 run_tests
-success=$?
-echo $success
-exit $success
+exit $?
+
