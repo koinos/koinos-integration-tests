@@ -172,7 +172,7 @@ func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operati
 	return &transaction, nil
 }
 
-func awaitChain(client *kjsonrpc.KoinosRPCClient) {
+func AwaitChain(client *kjsonrpc.KoinosRPCClient) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	var waitDuration int64 = 1
@@ -194,7 +194,7 @@ func awaitChain(client *kjsonrpc.KoinosRPCClient) {
 	}
 }
 
-func outputDocker(t *testing.T) {
+func OutputDocker(t *testing.T) {
 	cmd := exec.Command("docker-compose", "logs")
 	var out bytes.Buffer
 	cmd.Stdout = &out

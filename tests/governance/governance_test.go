@@ -2,10 +2,10 @@ package governance
 
 import (
 	"fmt"
+	"koinos-integration-tests/integration"
 	"testing"
 	"time"
 
-	integration "github.com/koinos/koinos-integration-test/integration"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	util "github.com/koinos/koinos-util-golang"
@@ -23,7 +23,7 @@ func TestGovernance(t *testing.T) {
 
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
-	integration.awaitChain(client)
+	integration.AwaitChain(client)
 
 	keyBytes, err := util.DecodeWIF("5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2")
 	assert.NoError(t, err)
