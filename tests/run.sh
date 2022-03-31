@@ -1,8 +1,6 @@
 
 #!/bin/bash
 
-set -e
-
 function run_tests() {
    success=0
    for test_dir in */ ; do
@@ -12,6 +10,7 @@ function run_tests() {
       success=$?||$success
       go test -v ./...
       success=$?||$success
+      docker-compose logs
       docker-compose down
       popd
    done
