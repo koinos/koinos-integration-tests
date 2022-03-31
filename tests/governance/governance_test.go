@@ -53,6 +53,4 @@ func TestGovernance(t *testing.T) {
 	assert.NoError(t, err)
 
 	fmt.Println(string(str))
-
-	t.Fail()
 }
