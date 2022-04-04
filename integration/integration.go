@@ -1,22 +1,27 @@
 package integration
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"fmt"
-	"os/exec"
-	"testing"
+	"os"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/gogo/protobuf/proto"
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
+	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
-	"github.com/stretchr/testify/assert"
 )
+
+const KoinWIF string = "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH"
+const GenesisWIF string = "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2"
+const GovernanceWIF string = "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV"
+const ResourcesWIF string = "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3"
+const PowWIF string = "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p"
 
 func SignBlock(block *protocol.Block, key *util.KoinosKey) error {
 	privateKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), key.PrivateBytes())
@@ -194,13 +199,138 @@ func AwaitChain(client *kjsonrpc.KoinosRPCClient) {
 	}
 }
 
-func OutputDocker(t *testing.T) {
-	cmd := exec.Command("docker-compose", "logs")
-	var out bytes.Buffer
-	cmd.Stdout = &out
+func BytesFromFile(file string, bufsize uint64) ([]byte, error) {
+	fileDesc, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer fileDesc.Close()
 
-	err := cmd.Run()
-	assert.NoError(t, err)
+	buf := make([]byte, bufsize)
+	len, err := fileDesc.Read(buf)
+	if err != nil {
+		return nil, err
+	}
 
-	fmt.Print(out.String())
+	return buf[:len], nil
+}
+
+func KeyFromWIF(wif string) (*util.KoinosKey, error) {
+	bytes, err := util.DecodeWIF(wif)
+	if err != nil {
+		return nil, err
+	}
+
+	key, err := util.NewKoinosKeysFromBytes(bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	return key, nil
+}
+
+func MakeUploadContract(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey, wasm []byte) (*protocol.Transaction, error) {
+	operation := protocol.Operation{}
+	operation.GetUploadContract().ContractId = key.PublicBytes()
+	operation.GetUploadContract().Bytecode = wasm
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{&operation}, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
+func UploadKoinContract(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey) error {
+	koinKey, err := KeyFromWIF(KoinWIF)
+	if err != nil {
+		return err
+	}
+
+	wasm, err := BytesFromFile("koin.wasm", 256000)
+	if err != nil {
+		return err
+	}
+
+	uploadOperation := protocol.Operation{}
+	uploadOperation.GetUploadContract().ContractId = koinKey.PublicBytes()
+	uploadOperation.GetUploadContract().Bytecode = wasm
+
+	setSystemContract := protocol.Operation{}
+	setSystemContract.GetSetSystemContract().ContractId = koinKey.PublicBytes()
+	setSystemContract.GetSetSystemContract().SystemContract = true
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{&uploadOperation, &setSystemContract}, key)
+	if err != nil {
+		return err
+	}
+
+	genesisKey, err := KeyFromWIF(GenesisWIF)
+	if err != nil {
+		return err
+	}
+
+	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	err = SignBlock(block, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func KoinMint(to []byte) (*protocol.Operation, error) {
+	koinKey, err := KeyFromWIF(KoinWIF)
+	if err != nil {
+		return nil, err
+	}
+
+	mintArgs := &token.MintArguments{}
+	mintArgs.To = to
+
+	args, err := proto.Marshal(mintArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	mintOperation := protocol.Operation{}
+	mintOperation.GetCallContract().ContractId = koinKey.PublicBytes()
+	mintOperation.GetCallContract().EntryPoint = 0xdc6f17bb
+	mintOperation.GetCallContract().Args = args
+
+	return &mintOperation, nil
+}
+
+func KoinTransfer(from []byte, to []byte) (*protocol.Operation, error) {
+	koinKey, err := KeyFromWIF(KoinWIF)
+	if err != nil {
+		return nil, err
+	}
+
+	transferArgs := &token.TransferArguments{}
+	transferArgs.From = from
+	transferArgs.To = to
+
+	args, err := proto.Marshal(transferArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	transferOperation := protocol.Operation{}
+	transferOperation.GetCallContract().ContractId = koinKey.PublicBytes()
+	transferOperation.GetCallContract().EntryPoint = 0x27f576ca
+	transferOperation.GetCallContract().Args = args
+
+	return &transferOperation, nil
 }

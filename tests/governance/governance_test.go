@@ -8,7 +8,6 @@ import (
 
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
-	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -25,23 +24,26 @@ func TestGovernance(t *testing.T) {
 
 	integration.AwaitChain(client)
 
-	keyBytes, err := util.DecodeWIF("5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2")
+	genesisKey, err := integration.KeyFromWIF("5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2")
 	assert.NoError(t, err)
 
-	key, err := util.NewKoinosKeysFromBytes(keyBytes)
+	// koinKey, err := integration.KeyFromWIF("5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH")
+	// assert.NoError(t, err)
+
+	// governanceKey, err := integration.KeyFromWIF("5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV")
+	// assert.NoError(t, err)
+
+	block, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
 	assert.NoError(t, err)
 
-	block, err := integration.CreateBlock(client, []*protocol.Transaction{}, key)
+	err = integration.SignBlock(block, genesisKey)
 	assert.NoError(t, err)
 
-	err = integration.SignBlock(block, key)
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
 	assert.NoError(t, err)
 
-	var cResp chain.SubmitBlockResponse
-	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &cResp)
-	assert.NoError(t, err)
-
-	b, err := protojson.Marshal(cResp.GetReceipt())
+	b, err := protojson.Marshal(submitBlockResp.GetReceipt())
 	assert.NoError(t, err)
 	fmt.Println(string(b))
 
