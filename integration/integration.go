@@ -242,26 +242,38 @@ func MakeUploadContract(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey, w
 	return transaction, nil
 }
 
-func UploadKoinContract(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey) error {
+func UploadKoinContract(client *kjsonrpc.KoinosRPCClient) error {
 	koinKey, err := KeyFromWIF(KoinWIF)
 	if err != nil {
 		return err
 	}
 
-	wasm, err := BytesFromFile("koin.wasm", 256000)
+	wasm, err := BytesFromFile("../../contracts/koin.wasm", 256000)
 	if err != nil {
 		return err
 	}
 
-	uploadOperation := protocol.Operation{}
-	uploadOperation.GetUploadContract().ContractId = koinKey.PublicBytes()
-	uploadOperation.GetUploadContract().Bytecode = wasm
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = koinKey.PublicBytes()
+	uco.Bytecode = wasm
 
-	setSystemContract := protocol.Operation{}
-	setSystemContract.GetSetSystemContract().ContractId = koinKey.PublicBytes()
-	setSystemContract.GetSetSystemContract().SystemContract = true
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
 
-	transaction, err := CreateTransaction(client, []*protocol.Operation{&uploadOperation, &setSystemContract}, key)
+	ssc := protocol.SetSystemContractOperation{}
+	ssc.ContractId = koinKey.PublicBytes()
+	ssc.SystemContract = true
+
+	setSystemContractOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemContract{
+			SetSystemContract: &ssc,
+		},
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{uploadOperation, setSystemContractOperation}, koinKey)
 	if err != nil {
 		return err
 	}

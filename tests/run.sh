@@ -24,6 +24,7 @@ function run_test() {
       continue
    fi
 
+   sleep 15
    go test -v ./...
    if [ $? -ne 0 ];
    then

@@ -36,7 +36,3 @@ services:
       depends_on:
          - node_config
       command: -a amqp://guest:guest@amqp:5672/
-
-   p2p:
-      image: koinos/koinos-p2p:${P2P_TAG:-latest}
-      command: -a amqp://guest:guest@amqp:5672/ -s bucket_brigade
