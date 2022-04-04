@@ -15,12 +15,6 @@ import (
 )
 
 func TestBucketBrigade(t *testing.T) {
-	kill_timer := time.NewTimer(10 * time.Minute)
-	go func() {
-		<-kill_timer.C
-		panic("Timer expired")
-	}()
-
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")
 	endClient := jsonrpc.NewClient("http://localhost:8082/")
 

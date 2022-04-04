@@ -16,12 +16,6 @@ import (
 )
 
 func TestPublishTransaction(t *testing.T) {
-	kill_timer := time.NewTimer(10 * time.Minute)
-	go func() {
-		<-kill_timer.C
-		panic("Timer expired")
-	}()
-
 	rpcClient := jsonrpc.NewClient("http://localhost:8080/")
 
 	headInfoResponse := chain.GetHeadInfoResponse{}

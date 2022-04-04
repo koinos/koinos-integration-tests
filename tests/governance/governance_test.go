@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"koinos-integration-tests/integration"
 	"testing"
-	"time"
 
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
@@ -14,12 +13,6 @@ import (
 )
 
 func TestGovernance(t *testing.T) {
-	killTimer := time.NewTimer(10 * time.Minute)
-	go func() {
-		<-killTimer.C
-		panic("Timer expired")
-	}()
-
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
 	integration.AwaitChain(t, client)

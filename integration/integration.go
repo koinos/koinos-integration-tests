@@ -189,7 +189,7 @@ func AwaitChain(t *testing.T, client *kjsonrpc.KoinosRPCClient) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	var waitDuration int64 = 1
-	const maxRetry int64 = 10
+	const maxRetry int64 = 5
 
 	for {
 		err := client.Call("chain.get_head_info", &chain.GetHeadInfoRequest{}, &headInfoResponse)

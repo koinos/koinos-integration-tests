@@ -24,7 +24,7 @@ function run_test() {
       continue
    fi
 
-   go test -v ./...
+   go test -timeout 5m -v ./...
    if [ $? -ne 0 ];
    then
       echo "Failed during integration test: ${1}"
@@ -32,7 +32,7 @@ function run_test() {
       code=1
    fi
 
-   docker-compose down
+   docker-compose down -v
    popd
 
    return $code
