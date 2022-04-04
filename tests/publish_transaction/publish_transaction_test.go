@@ -122,6 +122,9 @@ func TestPublishTransaction(t *testing.T) {
 		ReturnReceipt:       false,
 	}
 	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
 	response, err := rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
