@@ -5,7 +5,6 @@ go 1.15
 require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/ethereum/go-ethereum v1.10.9 // indirect
-	github.com/gogo/protobuf v1.3.1
 	github.com/koinos/koinos-proto-golang v0.3.1-0.20220401182752-3551cd2e289f
 	github.com/koinos/koinos-util-golang v0.0.0-20220317175432-7b4a7a102894
 	github.com/multiformats/go-multihash v0.1.0

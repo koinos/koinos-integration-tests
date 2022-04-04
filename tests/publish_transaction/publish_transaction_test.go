@@ -92,7 +92,7 @@ func TestPublishTransaction(t *testing.T) {
 		},
 	}
 
-	id, err := krpc.SubmitTransaction(ops, key)
+	txReceipt, err := krpc.SubmitTransaction(ops, key, &kjsonrpc.SubmissionParams{Nonce: 0, RCLimit: 0})
 
 	if err != nil {
 		t.Error(err)
@@ -170,7 +170,7 @@ func TestPublishTransaction(t *testing.T) {
 
 	trx := blockItem.Block.Transactions[0]
 
-	if bytes.Compare(trx.Id, id) != 0 {
+	if !bytes.Equal(trx.Id, txReceipt.Id) {
 		t.Errorf("Unexpected transaction id")
 	}
 }

@@ -24,7 +24,6 @@ function run_test() {
       continue
    fi
 
-   sleep 15
    go test -v ./...
    if [ $? -ne 0 ];
    then
@@ -42,7 +41,7 @@ function run_test() {
 function run_tests() {
    local code=0
 
-   for dir in */ ; do
+   for dir in tests/*/ ; do
      run_test $dir
      if [ $? -ne 0 ];
      then
@@ -57,7 +56,7 @@ if [ $# -eq 0 ];
 then
    run_tests
 else
-   run_test $1
+   run_test tests/$1
 fi
 
 exit $?

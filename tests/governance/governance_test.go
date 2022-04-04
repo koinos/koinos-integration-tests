@@ -22,7 +22,7 @@ func TestGovernance(t *testing.T) {
 
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
-	integration.AwaitChain(client)
+	integration.AwaitChain(t, client)
 
 	genesisKey, err := integration.KeyFromWIF("5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2")
 	assert.NoError(t, err)
