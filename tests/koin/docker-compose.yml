@@ -7,7 +7,7 @@ services:
 
    node_config:
     build:
-      context: ../../node-config
+      context: ../../node_config
     volumes:
       -  config_volume:/koinos
 

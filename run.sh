@@ -24,6 +24,7 @@ function run_test() {
       continue
    fi
 
+   go clean -testcache
    go test -timeout 5m -v ./...
    if [ $? -ne 0 ];
    then

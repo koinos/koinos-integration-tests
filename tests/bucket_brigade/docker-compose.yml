@@ -22,7 +22,7 @@ services:
 
   producer_config:
     build:
-      context: ../../node-config
+      context: ../../node_config
     volumes:
       - producer_volume:/koinos
 
@@ -94,7 +94,7 @@ services:
 
   bucket1_config:
     build:
-      context: ../../node-config
+      context: ../../node_config
     volumes:
       - bucket1_volume:/koinos
 
@@ -147,7 +147,7 @@ services:
 
   bucket2_config:
     build:
-      context: ../../node-config
+      context: ../../node_config
     volumes:
       - bucket2_volume:/koinos
 
