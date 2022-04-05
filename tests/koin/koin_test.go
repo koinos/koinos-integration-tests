@@ -22,10 +22,13 @@ func TestKoin(t *testing.T) {
 
 	assert.NotEqualValues(t, aliceKey, bobKey)
 
+	koinKey, err := integration.GetKey(integration.Koin)
+	assert.NoError(t, err)
+
 	integration.AwaitChain(t, client)
 
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadKoinContract(client)
+	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
 	assert.NoError(t, err)
 
 	t.Logf("Minting 1000 satoshis to alice")

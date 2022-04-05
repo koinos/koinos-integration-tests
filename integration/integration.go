@@ -2,6 +2,7 @@ package integration
 
 import (
 	"crypto/sha256"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -17,11 +18,29 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const KoinWIF string = "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH"
-const GenesisWIF string = "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2"
-const GovernanceWIF string = "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV"
-const ResourcesWIF string = "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3"
-const PowWIF string = "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p"
+const (
+	Governance int = 0
+	Koin       int = 1
+	Genesis    int = 2
+	Resources  int = 3
+	Pow        int = 4
+)
+
+var wifMap = map[int]string{
+	Governance: "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV",
+	Koin:       "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH",
+	Genesis:    "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
+	Resources:  "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
+	Pow:        "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
+}
+
+func GetKey(keyType int) (*util.KoinosKey, error) {
+	wif, exists := wifMap[keyType]
+	if exists {
+		return KeyFromWIF(wif)
+	}
+	return nil, errors.New("invalid key type")
+}
 
 func SignBlock(block *protocol.Block, key *util.KoinosKey) error {
 	privateKey, _ := btcec.PrivKeyFromBytes(btcec.S256(), key.PrivateBytes())
@@ -237,19 +256,183 @@ func KeyFromWIF(wif string) (*util.KoinosKey, error) {
 	return key, nil
 }
 
-func UploadKoinContract(client *kjsonrpc.KoinosRPCClient) error {
-	koinKey, err := KeyFromWIF(KoinWIF)
+func KoinMint(client *kjsonrpc.KoinosRPCClient, to []byte, value uint64) error {
+	koinKey, err := GetKey(Koin)
 	if err != nil {
 		return err
 	}
 
-	wasm, err := BytesFromFile("../../contracts/koin.wasm", 256000)
+	op, err := MakeKoinMintOperation(to, value)
+	if err != nil {
+		return err
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{op}, koinKey)
+	if err != nil {
+		return err
+	}
+
+	genesisKey, err := GetKey(Genesis)
+	if err != nil {
+		return err
+	}
+
+	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	err = SignBlock(block, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func MakeKoinMintOperation(to []byte, value uint64) (*protocol.Operation, error) {
+	koinKey, err := GetKey(Koin)
+	if err != nil {
+		return nil, err
+	}
+
+	mintArgs := &token.MintArguments{}
+	mintArgs.To = to
+	mintArgs.Value = value
+
+	args, err := proto.Marshal(mintArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	mop := &protocol.CallContractOperation{}
+	mop.ContractId = koinKey.AddressBytes()
+	mop.EntryPoint = 0xdc6f17bb
+	mop.Args = args
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: mop,
+		},
+	}
+
+	return op, nil
+}
+
+func KoinBalance(client *kjsonrpc.KoinosRPCClient, address []byte) (uint64, error) {
+	koinKey, err := GetKey(Koin)
+	if err != nil {
+		return 0, err
+	}
+
+	balance, err := client.GetAccountBalance(address, koinKey.AddressBytes(), 0x5c721497)
+	if err != nil {
+		return 0, err
+	}
+
+	return balance, nil
+}
+
+func KoinTotalSupply(client *kjsonrpc.KoinosRPCClient) (uint64, error) {
+	koinKey, err := GetKey(Koin)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := client.ReadContract(make([]byte, 0), koinKey.AddressBytes(), 0xb0da3934)
+	if err != nil {
+		return 0, err
+	}
+
+	totalSupply := &token.TotalSupplyResult{}
+	err = proto.Unmarshal(resp.GetResult(), totalSupply)
+	if err != nil {
+		return 0, err
+	}
+
+	return totalSupply.GetValue(), nil
+}
+
+func KoinTransfer(client *kjsonrpc.KoinosRPCClient, from *util.KoinosKey, to []byte, value uint64) error {
+	op, err := MakeKoinTransferOperation(from.AddressBytes(), to, value)
+	if err != nil {
+		return err
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{op}, from)
+	if err != nil {
+		return err
+	}
+
+	genesisKey, err := GetKey(Genesis)
+	if err != nil {
+		return err
+	}
+
+	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	err = SignBlock(block, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func MakeKoinTransferOperation(from []byte, to []byte, value uint64) (*protocol.Operation, error) {
+	koinKey, err := GetKey(Koin)
+	if err != nil {
+		return nil, err
+	}
+
+	transferArgs := &token.TransferArguments{}
+	transferArgs.From = from
+	transferArgs.To = to
+	transferArgs.Value = value
+
+	args, err := proto.Marshal(transferArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	xfer := &protocol.CallContractOperation{}
+	xfer.ContractId = koinKey.AddressBytes()
+	xfer.EntryPoint = 0x27f576ca
+	xfer.Args = args
+
+	transferOperation := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: xfer,
+		},
+	}
+
+	return transferOperation, nil
+}
+
+func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) error {
+
+	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return err
 	}
 
 	uco := protocol.UploadContractOperation{}
-	uco.ContractId = koinKey.AddressBytes()
+	uco.ContractId = key.AddressBytes()
 	uco.Bytecode = wasm
 
 	uploadOperation := &protocol.Operation{
@@ -258,18 +441,18 @@ func UploadKoinContract(client *kjsonrpc.KoinosRPCClient) error {
 		},
 	}
 
-	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, koinKey)
+	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
 	if err != nil {
 		return err
 	}
 
-	genesisKey, err := KeyFromWIF(GenesisWIF)
+	genesisKey, err := GetKey(Genesis)
 	if err != nil {
 		return err
 	}
 
 	ssc := protocol.SetSystemContractOperation{}
-	ssc.ContractId = koinKey.AddressBytes()
+	ssc.ContractId = key.AddressBytes()
 	ssc.SystemContract = true
 
 	setSystemContractOperation := &protocol.Operation{
@@ -300,172 +483,4 @@ func UploadKoinContract(client *kjsonrpc.KoinosRPCClient) error {
 	}
 
 	return nil
-}
-
-func KoinMint(client *kjsonrpc.KoinosRPCClient, to []byte, value uint64) error {
-	koinKey, err := KeyFromWIF(KoinWIF)
-	if err != nil {
-		return err
-	}
-
-	op, err := MakeKoinMintOperation(to, value)
-	if err != nil {
-		return err
-	}
-
-	transaction, err := CreateTransaction(client, []*protocol.Operation{op}, koinKey)
-	if err != nil {
-		return err
-	}
-
-	genesisKey, err := KeyFromWIF(GenesisWIF)
-	if err != nil {
-		return err
-	}
-
-	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
-	if err != nil {
-		return err
-	}
-
-	err = SignBlock(block, genesisKey)
-	if err != nil {
-		return err
-	}
-
-	var submitBlockResp chain.SubmitBlockResponse
-	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func MakeKoinMintOperation(to []byte, value uint64) (*protocol.Operation, error) {
-	koinKey, err := KeyFromWIF(KoinWIF)
-	if err != nil {
-		return nil, err
-	}
-
-	mintArgs := &token.MintArguments{}
-	mintArgs.To = to
-	mintArgs.Value = value
-
-	args, err := proto.Marshal(mintArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	mop := &protocol.CallContractOperation{}
-	mop.ContractId = koinKey.AddressBytes()
-	mop.EntryPoint = 0xdc6f17bb
-	mop.Args = args
-
-	op := &protocol.Operation{
-		Op: &protocol.Operation_CallContract{
-			CallContract: mop,
-		},
-	}
-
-	return op, nil
-}
-
-func KoinBalance(client *kjsonrpc.KoinosRPCClient, address []byte) (uint64, error) {
-	koinKey, err := KeyFromWIF(KoinWIF)
-	if err != nil {
-		return 0, err
-	}
-
-	balance, err := client.GetAccountBalance(address, koinKey.AddressBytes(), 0x5c721497)
-	if err != nil {
-		return 0, err
-	}
-
-	return balance, nil
-}
-
-func KoinTotalSupply(client *kjsonrpc.KoinosRPCClient) (uint64, error) {
-	koinKey, err := KeyFromWIF(KoinWIF)
-	if err != nil {
-		return 0, err
-	}
-
-	resp, err := client.ReadContract(make([]byte, 0), koinKey.AddressBytes(), 0xb0da3934)
-	if err != nil {
-		return 0, err
-	}
-
-	totalSupply := &token.TotalSupplyResult{}
-	err = proto.Unmarshal(resp.GetResult(), totalSupply)
-	if err != nil {
-		return 0, err
-	}
-
-	return totalSupply.GetValue(), nil
-}
-
-func KoinTransfer(client *kjsonrpc.KoinosRPCClient, from *util.KoinosKey, to []byte, value uint64) error {
-	op, err := MakeKoinTransferOperation(from.AddressBytes(), to, value)
-	if err != nil {
-		return err
-	}
-
-	transaction, err := CreateTransaction(client, []*protocol.Operation{op}, from)
-	if err != nil {
-		return err
-	}
-
-	genesisKey, err := KeyFromWIF(GenesisWIF)
-	if err != nil {
-		return err
-	}
-
-	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
-	if err != nil {
-		return err
-	}
-
-	err = SignBlock(block, genesisKey)
-	if err != nil {
-		return err
-	}
-
-	var submitBlockResp chain.SubmitBlockResponse
-	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func MakeKoinTransferOperation(from []byte, to []byte, value uint64) (*protocol.Operation, error) {
-	koinKey, err := KeyFromWIF(KoinWIF)
-	if err != nil {
-		return nil, err
-	}
-
-	transferArgs := &token.TransferArguments{}
-	transferArgs.From = from
-	transferArgs.To = to
-	transferArgs.Value = value
-
-	args, err := proto.Marshal(transferArgs)
-	if err != nil {
-		return nil, err
-	}
-
-	xfer := &protocol.CallContractOperation{}
-	xfer.ContractId = koinKey.AddressBytes()
-	xfer.EntryPoint = 0x27f576ca
-	xfer.Args = args
-
-	transferOperation := &protocol.Operation{
-		Op: &protocol.Operation_CallContract{
-			CallContract: xfer,
-		},
-	}
-
-	return transferOperation, nil
 }
