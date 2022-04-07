@@ -9,12 +9,14 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
+	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
+	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -424,8 +426,53 @@ func MakeKoinTransferOperation(from []byte, to []byte, value uint64) (*protocol.
 	return transferOperation, nil
 }
 
-func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) error {
+func SetSystemCallOverride(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey, entryPoint uint32, systemCall uint32) error {
+	op := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: systemCall,
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_SystemCallBundle{
+						SystemCallBundle: &protocol.ContractCallBundle{
+							ContractId: key.AddressBytes(),
+							EntryPoint: entryPoint,
+						},
+					},
+				},
+			},
+		},
+	}
 
+	genesisKey, err := GetKey(Genesis)
+	if err != nil {
+		return err
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{op}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	err = SignBlock(block, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) error {
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return err
@@ -483,4 +530,36 @@ func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *ut
 	}
 
 	return nil
+}
+
+func GovernanceGetProposals(client *kjsonrpc.KoinosRPCClient) ([]*governance.ProposalRecord, error) {
+	governanceKey, err := GetKey(Governance)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := client.ReadContract(make([]byte, 0), governanceKey.AddressBytes(), 0xd44caa11)
+	if err != nil {
+		return nil, err
+	}
+
+	proposalResult := &governance.GetProposalsResult{}
+	err = proto.Unmarshal(resp.GetResult(), proposalResult)
+	if err != nil {
+		return nil, err
+	}
+
+	return proposalResult.GetValue(), nil
+}
+
+func NoError(t *testing.T, err error) {
+	var rpcErr kjsonrpc.KoinosRPCError
+
+	if err != nil && errors.As(err, &rpcErr) {
+		for _, l := range rpcErr.Logs {
+			t.Logf(l)
+		}
+	}
+
+	assert.NoError(t, err)
 }
