@@ -2,12 +2,15 @@ package integration
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcutil/base58"
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
@@ -17,7 +20,9 @@ import (
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 const (
@@ -42,6 +47,20 @@ func GetKey(keyType int) (*util.KoinosKey, error) {
 		return KeyFromWIF(wif)
 	}
 	return nil, errors.New("invalid key type")
+}
+
+type eventList []*protocol.EventData
+
+func (e eventList) Len() int {
+	return len(e)
+}
+
+func (e eventList) Less(i, j int) bool {
+	return e[i].Sequence < e[j].Sequence
+}
+
+func (e eventList) Swap(i, j int) {
+	e[i], e[j] = e[j], e[i]
 }
 
 func SignBlock(block *protocol.Block, key *util.KoinosKey) error {
@@ -472,6 +491,30 @@ func SetSystemCallOverride(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey
 	return nil
 }
 
+func UploadContractTransaction(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) (*protocol.Transaction, error) {
+	wasm, err := BytesFromFile(file, 512000)
+	if err != nil {
+		return nil, err
+	}
+
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = key.AddressBytes()
+	uco.Bytecode = wasm
+
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
+	if err != nil {
+		return nil, err
+	}
+
+	return transaction, nil
+}
+
 func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) error {
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
@@ -550,6 +593,121 @@ func GovernanceGetProposals(client *kjsonrpc.KoinosRPCClient) ([]*governance.Pro
 	}
 
 	return proposalResult.GetValue(), nil
+}
+
+func GovernanceSubmitProposal(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey, proposal *protocol.Transaction, fee uint64) (*protocol.BlockReceipt, error) {
+	governanceKey, err := GetKey(Governance)
+	if err != nil {
+		return nil, err
+	}
+
+	submitProposalArgs := &governance.SubmitProposalArguments{}
+	submitProposalArgs.Proposal = proposal
+	submitProposalArgs.Fee = fee
+
+	args, err := proto.Marshal(submitProposalArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	cc := protocol.CallContractOperation{}
+	cc.ContractId = governanceKey.AddressBytes()
+	cc.EntryPoint = 0xe74b785c
+	cc.Args = args
+
+	callContractOperation := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &cc,
+		},
+	}
+
+	transaction, err := CreateTransaction(client, []*protocol.Operation{callContractOperation}, key)
+	if err != nil {
+		return nil, err
+	}
+
+	genesisKey, err := GetKey(Genesis)
+	if err != nil {
+		return nil, err
+	}
+
+	block, err := CreateBlock(client, []*protocol.Transaction{transaction}, genesisKey)
+	if err != nil {
+		return nil, err
+	}
+
+	err = SignBlock(block, genesisKey)
+	if err != nil {
+		return nil, err
+	}
+
+	var submitBlockResp chain.SubmitBlockResponse
+	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return submitBlockResp.Receipt, nil
+}
+
+func EventsFromBlockReceipt(blockReceipt *protocol.BlockReceipt) []*protocol.EventData {
+	var events []*protocol.EventData
+
+	events = append(events, blockReceipt.Events...)
+
+	for _, transactionReceipt := range blockReceipt.TransactionReceipts {
+		events = append(events, transactionReceipt.Events...)
+	}
+
+	sort.Sort(eventList(events))
+
+	return events
+}
+
+func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
+	blockID := base58.Encode(blockReceipt.Id)
+	t.Logf("Block: " + blockID)
+
+	if len(blockReceipt.Logs) > 0 {
+		t.Logf(" * Logs")
+		for _, log := range blockReceipt.Logs {
+			t.Logf("  - " + log)
+		}
+	}
+
+	if len(blockReceipt.Events) > 0 {
+		t.Logf(" * Events")
+		for _, event := range blockReceipt.Events {
+			bytes := base64.StdEncoding.EncodeToString(event.Data)
+			t.Logf("  - " + event.Name + ": " + bytes)
+		}
+	}
+
+	for _, txReceipt := range blockReceipt.TransactionReceipts {
+		transactionID := base58.Encode(txReceipt.Id)
+		t.Logf(" > Transaction: " + transactionID)
+
+		if len(txReceipt.Logs) > 0 {
+			t.Logf("  * Logs")
+			for _, log := range txReceipt.Logs {
+				t.Logf("   - " + log)
+			}
+		}
+
+		if len(txReceipt.Events) > 0 {
+			t.Logf("  * Events")
+			for _, event := range txReceipt.Events {
+				bytes := base64.StdEncoding.EncodeToString(event.Data)
+				t.Logf("   - " + event.Name + ": " + bytes)
+			}
+		}
+	}
+}
+
+func LogProto(t *testing.T, message protoreflect.ProtoMessage) {
+	text, err := protojson.Marshal(message)
+	NoError(t, err)
+	t.Logf(string(text))
 }
 
 func NoError(t *testing.T, err error) {
