@@ -25,16 +25,14 @@ type Governance struct {
 }
 
 // GetGoverance returns the goverance contract object
-func GetGovernance(client *rpc.KoinosRPCClient) (*Governance, error) {
-	goverancneKey, err := integration.GetKey(integration.Governance)
-	if err != nil {
-		return nil, err
-	}
-	return &Governance{key: goverancneKey, client: client}, nil
+func GetGovernance(client *rpc.KoinosRPCClient) *Governance {
+	goverancneKey, _ := integration.GetKey(integration.Governance)
+
+	return &Governance{key: goverancneKey, client: client}
 }
 
 // SubmitProposal to the goverance contract
-func (g *Governance) SubmitProposal(payer *util.KoinosKey, trx *protocol.Transaction, fee uint64) error {
+func (g *Governance) SubmitProposal(payer *util.KoinosKey, trx *protocol.Transaction, fee uint64) (*protocol.BlockReceipt, error) {
 	submitProposalArgs := &governance.SubmitProposalArguments{
 		Proposal: trx,
 		Fee:      fee,
@@ -42,7 +40,7 @@ func (g *Governance) SubmitProposal(payer *util.KoinosKey, trx *protocol.Transac
 
 	args, err := proto.Marshal(submitProposalArgs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	op := &protocol.Operation{
@@ -57,11 +55,10 @@ func (g *Governance) SubmitProposal(payer *util.KoinosKey, trx *protocol.Transac
 
 	transaction, err := integration.CreateTransaction(g.client, []*protocol.Operation{op}, payer)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = integration.CreateBlock(g.client, []*protocol.Transaction{transaction})
-	return err
+	return integration.CreateBlock(g.client, []*protocol.Transaction{transaction})
 }
 
 // GetProposalById

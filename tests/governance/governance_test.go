@@ -37,8 +37,8 @@ func TestGovernance(t *testing.T) {
 	integration.LogBlockReceipt(t, receipt)
 
 	t.Logf("Querying proposals")
-	gov := govUtil.NewGovernance(client)
-	proposals, err := gov.GetProposals(client)
+	gov := govUtil.GetGovernance(client)
+	proposals, err := gov.GetProposals()
 	integration.NoError(t, err)
 
 	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")

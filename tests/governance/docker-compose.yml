@@ -31,10 +31,10 @@ services:
       image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
       command: -a amqp://guest:guest@amqp:5672/
 
-#   chain:
-#      image: koinos/koinos-chain:${CHAIN_TAG:-latest}
-#      volumes:
-#         - config_volume:/root/.koinos
-#      depends_on:
-#         - node_config
-#      command: -a amqp://guest:guest@amqp:5672/
+   chain:
+      image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+      volumes:
+         - config_volume:/root/.koinos
+      depends_on:
+         - node_config
+      command: -a amqp://guest:guest@amqp:5672/
