@@ -2,11 +2,11 @@ package governance
 
 import (
 	"koinos-integration-tests/integration"
+	govUtil "koinos-integration-tests/integration/governance"
 	"testing"
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/assert"
 )
@@ -31,20 +31,14 @@ func TestGovernance(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
-	block, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
 	integration.NoError(t, err)
 
-	err = integration.SignBlock(block, genesisKey)
-	integration.NoError(t, err)
-
-	var submitBlockResp chainrpc.SubmitBlockResponse
-	err = client.Call("chain.submit_block", &chainrpc.SubmitBlockRequest{Block: block}, &submitBlockResp)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, submitBlockResp.Receipt)
+	integration.LogBlockReceipt(t, receipt)
 
 	t.Logf("Querying proposals")
-	proposals, err := integration.GovernanceGetProposals(client)
+	gov := govUtil.NewGovernance(client)
+	proposals, err := gov.GetProposals(client)
 	integration.NoError(t, err)
 
 	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
@@ -55,7 +49,7 @@ func TestGovernance(t *testing.T) {
 	proposal.Id = []byte{0x01, 0x02, 0x03}
 	proposal.Header.RcLimit = 10
 
-	blockReceipt, err := integration.GovernanceSubmitProposal(client, governanceKey, proposal, 100)
+	blockReceipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, blockReceipt)
@@ -66,7 +60,7 @@ func TestGovernance(t *testing.T) {
 	assert.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
 
 	t.Logf("Querying proposals")
-	proposals, err = integration.GovernanceGetProposals(client)
+	proposals, err = gov.GetProposals()
 	integration.NoError(t, err)
 
 	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")

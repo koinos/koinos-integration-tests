@@ -57,7 +57,10 @@ if [ $# -eq 0 ];
 then
    run_tests
 else
-   run_test tests/$1
+   for test in "$@"
+   do
+      run_test tests/$test
+   done
 fi
 
 exit $?
