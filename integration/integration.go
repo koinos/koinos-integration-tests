@@ -196,9 +196,9 @@ func CreateBlocks(client *kjsonrpc.KoinosRPCClient, n int, vars ...interface{}) 
 	receipts := make([]*protocol.BlockReceipt, 0)
 
 	for i := 0; i < n; i++ {
-		receipt, err := CreateBlock(client, []*protocol.Transaction{}, vars)
+		receipt, err := CreateBlock(client, []*protocol.Transaction{}, vars...)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 
 		receipts = append(receipts, receipt)

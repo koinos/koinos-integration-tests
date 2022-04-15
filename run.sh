@@ -25,11 +25,11 @@ function run_test() {
    fi
 
    go clean -testcache
-   go test -timeout 5m -v ./...
+   go test -timeout 30m -v ./...
    if [ $? -ne 0 ];
    then
       echo "Failed during integration test: ${1}"
-      docker-compose logs
+      #docker-compose logs
       code=1
    fi
 

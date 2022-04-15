@@ -3,6 +3,7 @@ package governance
 import (
 	"koinos-integration-tests/integration"
 	govUtil "koinos-integration-tests/integration/governance"
+	"strconv"
 	"testing"
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
@@ -49,12 +50,12 @@ func TestGovernance(t *testing.T) {
 	proposal.Id = []byte{0x01, 0x02, 0x03}
 	proposal.Header.RcLimit = 10
 
-	blockReceipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
+	receipt, err = gov.SubmitProposal(governanceKey, proposal, 100)
 	integration.NoError(t, err)
 
-	integration.LogBlockReceipt(t, blockReceipt)
+	integration.LogBlockReceipt(t, receipt)
 
-	blockEvents := integration.EventsFromBlockReceipt(blockReceipt)
+	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
 	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
 	assert.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
@@ -64,4 +65,24 @@ func TestGovernance(t *testing.T) {
 	integration.NoError(t, err)
 
 	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+
+	t.Logf("Pushing blocks to enter the voting period")
+
+	fn := func(b *protocol.Block) error {
+		if b.Header.Height%100 == 0 {
+			t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
+		}
+		return nil
+	}
+	_, err = integration.CreateBlocks(client, 60479, fn, genesisKey)
+	integration.NoError(t, err)
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
 }
