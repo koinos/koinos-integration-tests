@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -155,8 +156,10 @@ type MQClient struct {
 }
 
 func NewKoinosMQClient(url string) *MQClient {
+	c := koinosmq.NewClient(url, koinosmq.NoRetry)
+	c.Start()
 	return &MQClient{
-		client: koinosmq.NewClient(url, koinosmq.ExponentialBackoff),
+		client: c,
 	}
 }
 
@@ -167,7 +170,9 @@ func (mq *MQClient) Call(method string, params proto.Message, returnType proto.M
 		return err
 	}
 
-	resBytes, err := mq.client.RPC("application/octet-stream", method, paramsBytes)
+	s := strings.Split(method, ".")
+
+	resBytes, err := mq.client.RPC("application/octet-stream", s[0], paramsBytes)
 	if err != nil {
 		return err
 	}
