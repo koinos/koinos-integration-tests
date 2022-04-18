@@ -525,7 +525,7 @@ func SetSystemCallOverride(client Client, key *util.KoinosKey, entryPoint uint32
 }
 
 // UploadContractTransaction creates a transaction containing an upload contract operation
-func UploadContractTransaction(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) (*protocol.Transaction, error) {
+func UploadContractTransaction(client Client, file string, key *util.KoinosKey) (*protocol.Transaction, error) {
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return nil, err
