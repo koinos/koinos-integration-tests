@@ -8,12 +8,11 @@ import (
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGovernance(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := integration.NewKoinosMQClient("http://localhost:8080/")
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)

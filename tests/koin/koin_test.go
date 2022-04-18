@@ -6,12 +6,11 @@ import (
 	"testing"
 
 	util "github.com/koinos/koinos-util-golang"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestKoin(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := integration.NewKoinosMQClient("http://localhost:8080/")
 
 	t.Logf("Generating key for alice")
 	aliceKey, err := util.GenerateKoinosKey()

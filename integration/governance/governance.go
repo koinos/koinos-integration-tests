@@ -7,7 +7,6 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
-	"github.com/koinos/koinos-util-golang/rpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -21,11 +20,11 @@ const (
 // A wrapper around the governance contract
 type Governance struct {
 	key    *util.KoinosKey
-	client *rpc.KoinosRPCClient
+	client integration.Client
 }
 
 // GetGoverance returns the goverance contract object
-func GetGovernance(client *rpc.KoinosRPCClient) *Governance {
+func GetGovernance(client integration.Client) *Governance {
 	goverancneKey, _ := integration.GetKey(integration.Governance)
 
 	return &Governance{key: goverancneKey, client: client}
@@ -72,7 +71,7 @@ func (g *Governance) GetProposalById(id []byte) (*governance.ProposalRecord, err
 		return nil, err
 	}
 
-	resp, err := g.client.ReadContract(args, g.key.AddressBytes(), getProposalByIdEntry)
+	resp, err := integration.ReadContract(g.client, args, g.key.AddressBytes(), getProposalByIdEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +116,7 @@ func (g *Governance) GetProposals(vars ...interface{}) ([]*governance.ProposalRe
 		return nil, err
 	}
 
-	resp, err := g.client.ReadContract(args, g.key.AddressBytes(), getProposalsEntry)
+	resp, err := integration.ReadContract(g.client, args, g.key.AddressBytes(), getProposalsEntry)
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +162,7 @@ func (g *Governance) GetProposalsByStatus(status governance.ProposalStatus, vars
 		return nil, err
 	}
 
-	resp, err := g.client.ReadContract(args, g.key.AddressBytes(), getProposalsByStatusEntry)
+	resp, err := integration.ReadContract(g.client, args, g.key.AddressBytes(), getProposalsByStatusEntry)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
-	"github.com/koinos/koinos-util-golang/rpc"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,16 +21,16 @@ const (
 type Token struct {
 	key             *util.KoinosKey
 	contractAddress []byte
-	client          *rpc.KoinosRPCClient
+	client          integration.Client
 }
 
 // NewToken returns a Token object using the contractAddress
-func NewToken(contractAddress []byte, client *rpc.KoinosRPCClient) *Token {
+func NewToken(contractAddress []byte, client integration.Client) *Token {
 	return &Token{contractAddress: contractAddress, client: client}
 }
 
 // GetKoinToken returns the KOIN Token object
-func GetKoinToken(client *rpc.KoinosRPCClient) *Token {
+func GetKoinToken(client integration.Client) *Token {
 	koinKey, _ := integration.GetKey(integration.Koin)
 	return &Token{key: koinKey, contractAddress: koinKey.AddressBytes(), client: client}
 }
@@ -73,7 +72,7 @@ func (t *Token) Mint(to []byte, value uint64) error {
 
 // Balance of an address
 func (t *Token) Balance(address []byte) (uint64, error) {
-	balance, err := t.client.GetAccountBalance(address, t.contractAddress, balanceOfEntry)
+	balance, err := integration.GetAccountBalance(t.client, address, t.contractAddress, balanceOfEntry)
 	if err != nil {
 		return 0, err
 	}
@@ -83,7 +82,7 @@ func (t *Token) Balance(address []byte) (uint64, error) {
 
 // TotalSupply of the token
 func (t *Token) TotalSupply() (uint64, error) {
-	resp, err := t.client.ReadContract(make([]byte, 0), t.contractAddress, totalSupplyEntry)
+	resp, err := integration.ReadContract(t.client, make([]byte, 0), t.contractAddress, totalSupplyEntry)
 	if err != nil {
 		return 0, err
 	}
