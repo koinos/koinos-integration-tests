@@ -9,9 +9,15 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/proto"
+)
+
+const (
+	Standard   int = 0
+	Governance int = 1
 )
 
 const (
@@ -50,16 +56,34 @@ func TestGovernance(t *testing.T) {
 
 	integration.LogBlockReceipt(t, receipt)
 
-	testExpiredStandardProposal(t, client)
-	testAppliedStandardProposal(t, client)
+	testFailedProposal(t, client, CreateLogOverrideProposal, Standard)
+	testSuccessfulProposal(t, client, CreateLogOverrideProposal, Standard)
 }
 
-func testAppliedStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient) {
+func testSuccessfulProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposalFactory func(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error), proposalType int) {
+	threshold := StandardThreshold
+	if proposalType == Governance {
+		threshold = GovernanceThreshold
+	}
+
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
 	governanceKey, err := integration.GetKey(integration.Governance)
 	integration.NoError(t, err)
+
+	t.Logf("Generating key for hello contract")
+	helloKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
+	t.Logf("Creating and uploading hello contract")
+	uploadTransaction, err := integration.UploadContractTransaction(client, "../../contracts/hello.wasm", helloKey)
+	integration.NoError(t, err)
+
+	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{uploadTransaction}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
 
 	t.Logf("Querying proposals")
 	gov := govUtil.GetGovernance(client)
@@ -69,12 +93,10 @@ func testAppliedStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
 
 	t.Logf("Submitting proposal")
-	proposal := &protocol.Transaction{}
-	proposal.Header = &protocol.TransactionHeader{}
-	proposal.Id = []byte{0x01, 0x02, 0x03}
-	proposal.Header.RcLimit = 10
+	proposal, err := proposalFactory(client)
+	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
+	receipt, err = gov.SubmitProposal(governanceKey, proposal, 100)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -162,7 +184,7 @@ func testAppliedStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 		return nil
 	}
 
-	receipts, err := integration.CreateBlocks(client, (VotePeriod * 60 / 100), logAndVote, genesisKey)
+	receipts, err := integration.CreateBlocks(client, (VotePeriod * threshold / 100), logAndVote, genesisKey)
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
@@ -171,7 +193,7 @@ func testAppliedStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 		assert.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
 	}
 
-	receipts, err = integration.CreateBlocks(client, (VotePeriod*40/100)-1, logPerK, genesisKey)
+	receipts, err = integration.CreateBlocks(client, (VotePeriod*(100-threshold)/100)-1, logPerK, genesisKey)
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
@@ -214,7 +236,12 @@ func testAppliedStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 	assert.NotNil(t, prec, "Expected no proposal from query")
 }
 
-func testExpiredStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient) {
+func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposalFactory func(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error), proposalType int) {
+	threshold := StandardThreshold
+	if proposalType == Governance {
+		threshold = GovernanceThreshold
+	}
+
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
@@ -229,10 +256,8 @@ func testExpiredStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
 
 	t.Logf("Submitting proposal")
-	proposal := &protocol.Transaction{}
-	proposal.Header = &protocol.TransactionHeader{}
-	proposal.Id = []byte{0x01, 0x02, 0x03}
-	proposal.Header.RcLimit = 10
+	proposal, err := proposalFactory(client)
+	integration.NoError(t, err)
 
 	receipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
 	integration.NoError(t, err)
@@ -322,7 +347,7 @@ func testExpiredStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 		return nil
 	}
 
-	receipts, err := integration.CreateBlocks(client, (VotePeriod*60/100)-1, logAndVote, genesisKey)
+	receipts, err := integration.CreateBlocks(client, (VotePeriod*threshold/100)-1, logAndVote, genesisKey)
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
@@ -331,7 +356,7 @@ func testExpiredStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 		assert.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
 	}
 
-	receipts, err = integration.CreateBlocks(client, (VotePeriod * 40 / 100), logPerK, genesisKey)
+	receipts, err = integration.CreateBlocks(client, (VotePeriod * (threshold - 100) / 100), logPerK, genesisKey)
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
@@ -372,4 +397,49 @@ func testExpiredStandardProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient)
 	integration.NoError(t, err)
 
 	assert.Nil(t, prec, "Expected no proposal from query")
+}
+
+func CreateLogOverrideProposal(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error) {
+	governanceKey, err := integration.GetKey(integration.Governance)
+	if err != nil {
+		return nil, err
+	}
+
+	syscallOverrideKey, err := util.GenerateKoinosKey()
+	if err != nil {
+		return nil, err
+	}
+
+	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
+	if err != nil {
+		return nil, err
+	}
+
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = syscallOverrideKey.AddressBytes()
+	uco.Bytecode = wasm
+
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
+
+	overrideOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_log),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_SystemCallBundle{
+						SystemCallBundle: &protocol.ContractCallBundle{
+							ContractId: syscallOverrideKey.AddressBytes(),
+							EntryPoint: uint32(0x00),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, overrideOperation}, governanceKey)
 }
