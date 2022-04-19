@@ -17,7 +17,12 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	cmsrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/contract_meta_store"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/mempool"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/p2p"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/transaction_store"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
@@ -25,6 +30,7 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 const (
@@ -163,25 +169,149 @@ func NewKoinosMQClient(url string) *MQClient {
 	}
 }
 
+func translateRequest(service string, method string, param proto.Message) ([]byte, error) {
+	switch service {
+	case "chain":
+		wrapped := chain.ChainRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param.ProtoReflect()))
+		return proto.Marshal(req)
+	case "block_store":
+		wrapped := block_store.BlockStoreRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param))
+		return proto.Marshal(req)
+	case "p2p":
+		wrapped := p2p.P2PRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param))
+		return proto.Marshal(req)
+	case "contract_meta_store":
+		wrapped := cmsrpc.ContractMetaStoreRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param))
+		return proto.Marshal(req)
+	case "mempool":
+		wrapped := mempool.MempoolRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param))
+		return proto.Marshal(req)
+	case "transaction_store":
+		wrapped := transaction_store.TransactionStoreRequest{}
+		desc := wrapped.ProtoReflect().Descriptor()
+		fieldd := desc.Fields().ByName(protoreflect.Name(method))
+		if fieldd == nil {
+			return nil, errors.New("unable to find field")
+		}
+		req := dynamicpb.NewMessage(desc)
+		req.Set(fieldd, protoreflect.ValueOf(param))
+		return proto.Marshal(req)
+	}
+	return nil, errors.New("error during service param mapping")
+}
+
+func translateResponse(service string, resBytes []byte, response *proto.Message) error {
+	switch service {
+	case "chain":
+		wrapped := chain.ChainResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	case "block_store":
+		wrapped := block_store.BlockStoreResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	case "p2p":
+		wrapped := p2p.P2PResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	case "contract_meta_store":
+		wrapped := cmsrpc.ContractMetaStoreResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	case "mempool":
+		wrapped := mempool.MempoolResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	case "transaction_store":
+		wrapped := transaction_store.TransactionStoreResponse{}
+		err := proto.Unmarshal(resBytes, &wrapped)
+		if err != nil {
+			return err
+		}
+		name := (*response).ProtoReflect().Descriptor().Name()
+		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+	}
+	return nil
+}
+
 func (mq *MQClient) Call(method string, params proto.Message, returnType proto.Message) error {
-	// Marshal the params
-	paramsBytes, err := proto.Marshal(params)
-	if err != nil {
-		return err
-	}
-
 	s := strings.Split(method, ".")
+	if len(s) != 2 {
+		return errors.New("unexpected method length")
+	}
 
-	resBytes, err := mq.client.RPC("application/octet-stream", s[0], paramsBytes)
+	reqBytes, err := translateRequest(s[0], s[1], params)
 	if err != nil {
 		return err
 	}
 
-	// Unmarshal the response
-	err = proto.Unmarshal(resBytes, returnType)
+	resBytes, err := mq.client.RPC("application/octet-stream", s[0], reqBytes)
 	if err != nil {
 		return err
 	}
+
+	translateResponse(s[0], resBytes, &returnType)
 
 	return err
 }
