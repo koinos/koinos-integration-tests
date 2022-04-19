@@ -10,7 +10,7 @@ import (
 )
 
 func TestKoin(t *testing.T) {
-	client := integration.NewKoinosMQClient("http://localhost:8080/")
+	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:5672/")
 
 	t.Logf("Generating key for alice")
 	aliceKey, err := util.GenerateKoinosKey()
