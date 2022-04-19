@@ -170,128 +170,76 @@ func NewKoinosMQClient(url string) *MQClient {
 }
 
 func translateRequest(service string, method string, param proto.Message) ([]byte, error) {
+	var wrapped proto.Message
+
 	switch service {
 	case "chain":
-		wrapped := chain.ChainRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param.ProtoReflect()))
-		return proto.Marshal(req)
+		wrapped = &chain.ChainRequest{}
+
 	case "block_store":
-		wrapped := block_store.BlockStoreRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param))
-		return proto.Marshal(req)
+		wrapped = &block_store.BlockStoreRequest{}
+
 	case "p2p":
-		wrapped := p2p.P2PRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param))
-		return proto.Marshal(req)
+		wrapped = &p2p.P2PRequest{}
+
 	case "contract_meta_store":
-		wrapped := cmsrpc.ContractMetaStoreRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param))
-		return proto.Marshal(req)
+		wrapped = &cmsrpc.ContractMetaStoreRequest{}
+
 	case "mempool":
-		wrapped := mempool.MempoolRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param))
-		return proto.Marshal(req)
+		wrapped = &mempool.MempoolRequest{}
+
 	case "transaction_store":
-		wrapped := transaction_store.TransactionStoreRequest{}
-		desc := wrapped.ProtoReflect().Descriptor()
-		fieldd := desc.Fields().ByName(protoreflect.Name(method))
-		if fieldd == nil {
-			return nil, errors.New("unable to find field")
-		}
-		req := dynamicpb.NewMessage(desc)
-		req.Set(fieldd, protoreflect.ValueOf(param))
-		return proto.Marshal(req)
+		wrapped = &transaction_store.TransactionStoreRequest{}
+
+	default:
+		return nil, fmt.Errorf("error during service param mapping")
 	}
-	return nil, errors.New("error during service param mapping")
+
+	desc := wrapped.ProtoReflect().Descriptor()
+	fieldd := desc.Fields().ByName(protoreflect.Name(method))
+	if fieldd == nil {
+		return nil, errors.New("unable to find field")
+	}
+	req := dynamicpb.NewMessage(desc)
+	req.Set(fieldd, protoreflect.ValueOf(param.ProtoReflect()))
+	return proto.Marshal(req)
 }
 
-func translateResponse(service string, resBytes []byte, response *proto.Message) error {
+func translateResponse(service string, resBytes []byte, response proto.Message) error {
+	var wrapped proto.Message
+
 	switch service {
 	case "chain":
-		wrapped := chain.ChainResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &chain.ChainResponse{}
+
 	case "block_store":
-		wrapped := block_store.BlockStoreResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &block_store.BlockStoreResponse{}
+
 	case "p2p":
-		wrapped := p2p.P2PResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &p2p.P2PResponse{}
+
 	case "contract_meta_store":
-		wrapped := cmsrpc.ContractMetaStoreResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &cmsrpc.ContractMetaStoreResponse{}
+
 	case "mempool":
-		wrapped := mempool.MempoolResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &mempool.MempoolResponse{}
+
 	case "transaction_store":
-		wrapped := transaction_store.TransactionStoreResponse{}
-		err := proto.Unmarshal(resBytes, &wrapped)
-		if err != nil {
-			return err
-		}
-		name := (*response).ProtoReflect().Descriptor().Name()
-		fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
-		*response = wrapped.ProtoReflect().Get(fieldd).Message().Interface()
+		wrapped = &transaction_store.TransactionStoreResponse{}
+
+	default:
+		return fmt.Errorf("unknown microservice")
 	}
+
+	err := proto.Unmarshal(resBytes, wrapped)
+	if err != nil {
+		return err
+	}
+
+	name := response.ProtoReflect().Descriptor().Name()
+	fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+	proto.Merge(response, wrapped.ProtoReflect().Get(fieldd).Message().Interface())
+
 	return nil
 }
 
@@ -311,7 +259,10 @@ func (mq *MQClient) Call(method string, params proto.Message, returnType proto.M
 		return err
 	}
 
-	translateResponse(s[0], resBytes, &returnType)
+	err = translateResponse(s[0], resBytes, returnType)
+	if err != nil {
+		return err
+	}
 
 	return err
 }
