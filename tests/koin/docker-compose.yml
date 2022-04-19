@@ -4,6 +4,8 @@ volumes:
 services:
    amqp:
       image: rabbitmq:alpine
+      ports:
+        - "5672:5672"
 
    node_config:
     build:

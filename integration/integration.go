@@ -7,20 +7,30 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/base58"
+	koinosmq "github.com/koinos/koinos-mq-golang"
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
+	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	cmsrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/contract_meta_store"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/mempool"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/p2p"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/transaction_store"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/dynamicpb"
 )
 
 const (
@@ -37,6 +47,224 @@ var wifMap = map[int]string{
 	Genesis:    "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
 	Resources:  "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
 	Pow:        "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
+}
+
+const (
+	ReadContractCall      = "chain.read_contract"
+	GetAccountNonceCall   = "chain.get_account_nonce"
+	GetAccountRcCall      = "chain.get_account_rc"
+	SubmitTransactionCall = "chain.submit_transaction"
+	GetChainIDCall        = "chain.get_chain_id"
+	GetContractMetaCall   = "contract_meta_store.get_contract_meta"
+)
+
+// Client is an interface for different types of message clients
+type Client interface {
+	Call(method string, params proto.Message, returnType proto.Message) error
+}
+
+// GetAccountNonce gets the nonce of a given account
+func GetAccountNonce(client Client, address []byte) (uint64, error) {
+	// Build the contract request
+	params := chain.GetAccountNonceRequest{
+		Account: address,
+	}
+
+	// Make the rpc call
+	var cResp chain.GetAccountNonceResponse
+	err := client.Call(GetAccountNonceCall, &params, &cResp)
+	if err != nil {
+		return 0, err
+	}
+
+	nonce, err := util.NonceBytesToUInt64(cResp.Nonce)
+	if err != nil {
+		return 0, err
+	}
+
+	return nonce, nil
+}
+
+// ReadContract reads from the given contract and returns the response
+func ReadContract(client Client, args []byte, contractID []byte, entryPoint uint32) (*chain.ReadContractResponse, error) {
+	// Build the contract request
+	params := chain.ReadContractRequest{ContractId: contractID, EntryPoint: entryPoint, Args: args}
+
+	// Make the rpc call
+	var cResp chain.ReadContractResponse
+	err := client.Call(ReadContractCall, &params, &cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return &cResp, nil
+}
+
+// GetAccountBalance gets the balance of a given account
+func GetAccountBalance(client Client, address []byte, contractID []byte, balanceOfEntry uint32) (uint64, error) {
+	// Make the rpc call
+	balanceOfArgs := &token.BalanceOfArguments{
+		Owner: address,
+	}
+	argBytes, err := proto.Marshal(balanceOfArgs)
+	if err != nil {
+		return 0, err
+	}
+
+	cResp, err := ReadContract(client, argBytes, contractID, balanceOfEntry)
+	if err != nil {
+		return 0, err
+	}
+
+	balanceOfReturn := &token.BalanceOfResult{}
+	err = proto.Unmarshal(cResp.Result, balanceOfReturn)
+	if err != nil {
+		return 0, err
+	}
+
+	return balanceOfReturn.Value, nil
+}
+
+// GetAccountRc gets the rc of a given account
+func GetAccountRc(client Client, address []byte) (uint64, error) {
+	// Build the contract request
+	params := chain.GetAccountRcRequest{
+		Account: address,
+	}
+
+	// Make the rpc call
+	var cResp chain.GetAccountRcResponse
+	err := client.Call(GetAccountRcCall, &params, &cResp)
+	if err != nil {
+		return 0, err
+	}
+
+	return cResp.Rc, nil
+}
+
+// GetChainID gets the chain id
+func GetChainID(client Client) ([]byte, error) {
+	// Build the contract request
+	params := chain.GetChainIdRequest{}
+
+	// Make the rpc call
+	var cResp chain.GetChainIdResponse
+	err := client.Call(GetChainIDCall, &params, &cResp)
+	if err != nil {
+		return nil, err
+	}
+
+	return cResp.ChainId, nil
+}
+
+type MQClient struct {
+	client *koinosmq.Client
+}
+
+func NewKoinosMQClient(url string) *MQClient {
+	c := koinosmq.NewClient(url, koinosmq.NoRetry)
+	c.Start()
+	return &MQClient{
+		client: c,
+	}
+}
+
+func translateRequest(service string, method string, param proto.Message) ([]byte, error) {
+	var wrapped proto.Message
+
+	switch service {
+	case "chain":
+		wrapped = &chain.ChainRequest{}
+
+	case "block_store":
+		wrapped = &block_store.BlockStoreRequest{}
+
+	case "p2p":
+		wrapped = &p2p.P2PRequest{}
+
+	case "contract_meta_store":
+		wrapped = &cmsrpc.ContractMetaStoreRequest{}
+
+	case "mempool":
+		wrapped = &mempool.MempoolRequest{}
+
+	case "transaction_store":
+		wrapped = &transaction_store.TransactionStoreRequest{}
+
+	default:
+		return nil, fmt.Errorf("error during service param mapping")
+	}
+
+	desc := wrapped.ProtoReflect().Descriptor()
+	fieldd := desc.Fields().ByName(protoreflect.Name(method))
+	if fieldd == nil {
+		return nil, errors.New("unable to find field")
+	}
+	req := dynamicpb.NewMessage(desc)
+	req.Set(fieldd, protoreflect.ValueOf(param.ProtoReflect()))
+	return proto.Marshal(req)
+}
+
+func translateResponse(service string, resBytes []byte, response proto.Message) error {
+	var wrapped proto.Message
+
+	switch service {
+	case "chain":
+		wrapped = &chain.ChainResponse{}
+
+	case "block_store":
+		wrapped = &block_store.BlockStoreResponse{}
+
+	case "p2p":
+		wrapped = &p2p.P2PResponse{}
+
+	case "contract_meta_store":
+		wrapped = &cmsrpc.ContractMetaStoreResponse{}
+
+	case "mempool":
+		wrapped = &mempool.MempoolResponse{}
+
+	case "transaction_store":
+		wrapped = &transaction_store.TransactionStoreResponse{}
+
+	default:
+		return fmt.Errorf("unknown microservice")
+	}
+
+	err := proto.Unmarshal(resBytes, wrapped)
+	if err != nil {
+		return err
+	}
+
+	name := response.ProtoReflect().Descriptor().Name()
+	fieldd := wrapped.ProtoReflect().Descriptor().Fields().ByName(name[0 : len(name)-9])
+	proto.Merge(response, wrapped.ProtoReflect().Get(fieldd).Message().Interface())
+
+	return nil
+}
+
+func (mq *MQClient) Call(method string, params proto.Message, returnType proto.Message) error {
+	s := strings.Split(method, ".")
+	if len(s) != 2 {
+		return errors.New("unexpected method length")
+	}
+
+	reqBytes, err := translateRequest(s[0], s[1], params)
+	if err != nil {
+		return err
+	}
+
+	resBytes, err := mq.client.RPC("application/octet-stream", s[0], reqBytes)
+	if err != nil {
+		return err
+	}
+
+	err = translateResponse(s[0], resBytes, returnType)
+	if err != nil {
+		return err
+	}
+
+	return err
 }
 
 func GetKey(keyType int) (*util.KoinosKey, error) {
@@ -65,7 +293,7 @@ func (e eventList) Swap(i, j int) {
 // Variadic arguments can be the following:
 //    key *util.KoinosKey - Key to produce the block with
 //    mod func(b *protocol.Block) error - Modification callback function
-func CreateBlock(client *kjsonrpc.KoinosRPCClient, transactions []*protocol.Transaction, vars ...interface{}) (*protocol.BlockReceipt, error) {
+func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...interface{}) (*protocol.BlockReceipt, error) {
 	var key *util.KoinosKey
 	var mod func(b *protocol.Block) error
 
@@ -192,7 +420,7 @@ func CreateBlock(client *kjsonrpc.KoinosRPCClient, transactions []*protocol.Tran
 // Variadic arguments can be the following:
 //    key *util.KoinosKey - Key to produce the block with
 //    mod func(b *protocol.Block) error - Modification callback function, called on each block
-func CreateBlocks(client *kjsonrpc.KoinosRPCClient, n int, vars ...interface{}) ([]*protocol.BlockReceipt, error) {
+func CreateBlocks(client Client, n int, vars ...interface{}) ([]*protocol.BlockReceipt, error) {
 	receipts := make([]*protocol.BlockReceipt, 0)
 
 	for i := 0; i < n; i++ {
@@ -210,7 +438,7 @@ func CreateBlocks(client *kjsonrpc.KoinosRPCClient, n int, vars ...interface{}) 
 // CreateTransaction creates a transaction from a list of operations
 // Variadic arguments can be the following:
 //    mod func(b *protocol.Block) error - Modification callback function, called on each block
-func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operation, key *util.KoinosKey, vars ...func(b *protocol.Transaction) error) (*protocol.Transaction, error) {
+func CreateTransaction(client Client, ops []*protocol.Operation, key *util.KoinosKey, vars ...func(b *protocol.Transaction) error) (*protocol.Transaction, error) {
 	var mod func(b *protocol.Transaction) error
 
 	if len(vars) > 0 {
@@ -223,7 +451,7 @@ func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operati
 	address := key.AddressBytes()
 
 	// Fetch the account's nonce
-	nonce, err := client.GetAccountNonce(address)
+	nonce, err := GetAccountNonce(client, address)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +462,7 @@ func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operati
 		return nil, err
 	}
 
-	rcLimit, err := client.GetAccountRc(address)
+	rcLimit, err := GetAccountRc(client, address)
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +482,7 @@ func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operati
 		return nil, err
 	}
 
-	chainID, err := client.GetChainID()
+	chainID, err := GetChainID(client)
 	if err != nil {
 		return nil, err
 	}
@@ -296,7 +524,7 @@ func CreateTransaction(client *kjsonrpc.KoinosRPCClient, ops []*protocol.Operati
 }
 
 // AwaitChain blocks until the chain rpc is responding
-func AwaitChain(t *testing.T, client *kjsonrpc.KoinosRPCClient) {
+func AwaitChain(t *testing.T, client Client) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	var waitDuration int64 = 1
@@ -351,7 +579,7 @@ func KeyFromWIF(wif string) (*util.KoinosKey, error) {
 }
 
 // SetSystemCallOverride overrides a system call with a contract and entrypoint call target
-func SetSystemCallOverride(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey, entryPoint uint32, systemCall uint32) error {
+func SetSystemCallOverride(client Client, key *util.KoinosKey, entryPoint uint32, systemCall uint32) error {
 	op := &protocol.Operation{
 		Op: &protocol.Operation_SetSystemCall{
 			SetSystemCall: &protocol.SetSystemCallOperation{
@@ -383,7 +611,7 @@ func SetSystemCallOverride(client *kjsonrpc.KoinosRPCClient, key *util.KoinosKey
 }
 
 // UploadContractTransaction creates a transaction containing an upload contract operation
-func UploadContractTransaction(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) (*protocol.Transaction, error) {
+func UploadContractTransaction(client Client, file string, key *util.KoinosKey) (*protocol.Transaction, error) {
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return nil, err
@@ -408,7 +636,7 @@ func UploadContractTransaction(client *kjsonrpc.KoinosRPCClient, file string, ke
 }
 
 // UploadSystemContract uploads a contract and sets it as a system contract
-func UploadSystemContract(client *kjsonrpc.KoinosRPCClient, file string, key *util.KoinosKey) error {
+func UploadSystemContract(client Client, file string, key *util.KoinosKey) error {
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return err

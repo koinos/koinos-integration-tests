@@ -21,7 +21,7 @@ const (
 )
 
 const (
-	BlocksPerWeek          = 604800 / 10
+	BlocksPerWeek          = 10
 	ReviewPeriod           = BlocksPerWeek
 	VotePeriod             = BlocksPerWeek * 2
 	ApplicationDelay       = BlocksPerWeek
@@ -60,7 +60,7 @@ func TestGovernance(t *testing.T) {
 	testSuccessfulProposal(t, client, CreateLogOverrideProposal, Standard)
 }
 
-func testSuccessfulProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposalFactory func(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error), proposalType int) {
+func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
@@ -130,9 +130,7 @@ func testSuccessfulProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, prop
 	t.Logf("Pushing blocks to enter the voting period")
 
 	logPerK := func(b *protocol.Block) error {
-		if b.Header.Height%1000 == 0 {
-			t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		}
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
 	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
@@ -178,9 +176,7 @@ func testSuccessfulProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, prop
 
 	logAndVote := func(b *protocol.Block) error {
 		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
-		if b.Header.Height%1000 == 0 {
-			t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		}
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
 
@@ -221,22 +217,23 @@ func testSuccessfulProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, prop
 	proposals, err = gov.GetProposals()
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+	assert.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
+	t.Logf("Status: " + proposals[0].Status.String())
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_approved)
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, 1, len(proposals), "Expected no proposals when querying governance contract")
+	assert.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
 
 	t.Logf("Querying proposals by ID")
 	prec, err = gov.GetProposalById(proposal.Id)
 	integration.NoError(t, err)
 
-	assert.NotNil(t, prec, "Expected no proposal from query")
+	assert.NotNil(t, prec, "Expected proposal from query")
 }
 
-func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposalFactory func(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error), proposalType int) {
+func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
@@ -293,9 +290,7 @@ func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposal
 	t.Logf("Pushing blocks to enter the voting period")
 
 	logPerK := func(b *protocol.Block) error {
-		if b.Header.Height%1000 == 0 {
-			t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		}
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
 	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
@@ -341,9 +336,7 @@ func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposal
 
 	logAndVote := func(b *protocol.Block) error {
 		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
-		if b.Header.Height%1000 == 0 {
-			t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		}
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
 
@@ -351,12 +344,13 @@ func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposal
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
+		integration.LogBlockReceipt(t, receipt)
 		blockEvents = integration.EventsFromBlockReceipt(receipt)
 		assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
 		assert.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
 	}
 
-	receipts, err = integration.CreateBlocks(client, (VotePeriod * (threshold - 100) / 100), logPerK, genesisKey)
+	receipts, err = integration.CreateBlocks(client, (VotePeriod * (100 - threshold) / 100), logPerK, genesisKey)
 	integration.NoError(t, err)
 
 	for _, receipt := range receipts {
@@ -399,47 +393,10 @@ func testFailedProposal(t *testing.T, client *kjsonrpc.KoinosRPCClient, proposal
 	assert.Nil(t, prec, "Expected no proposal from query")
 }
 
-func CreateLogOverrideProposal(client *kjsonrpc.KoinosRPCClient) (*protocol.Transaction, error) {
-	governanceKey, err := integration.GetKey(integration.Governance)
-	if err != nil {
-		return nil, err
-	}
-
-	syscallOverrideKey, err := util.GenerateKoinosKey()
-	if err != nil {
-		return nil, err
-	}
-
-	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
-	if err != nil {
-		return nil, err
-	}
-
-	uco := protocol.UploadContractOperation{}
-	uco.ContractId = syscallOverrideKey.AddressBytes()
-	uco.Bytecode = wasm
-
-	uploadOperation := &protocol.Operation{
-		Op: &protocol.Operation_UploadContract{
-			UploadContract: &uco,
-		},
-	}
-
-	overrideOperation := &protocol.Operation{
-		Op: &protocol.Operation_SetSystemCall{
-			SetSystemCall: &protocol.SetSystemCallOperation{
-				CallId: uint32(chain.SystemCallId_log),
-				Target: &protocol.SystemCallTarget{
-					Target: &protocol.SystemCallTarget_SystemCallBundle{
-						SystemCallBundle: &protocol.ContractCallBundle{
-							ContractId: syscallOverrideKey.AddressBytes(),
-							EntryPoint: uint32(0x00),
-						},
-					},
-				},
-			},
-		},
-	}
-
-	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, overrideOperation}, governanceKey)
+func CreateLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
+	proposal := &protocol.Transaction{}
+	proposal.Header = &protocol.TransactionHeader{}
+	proposal.Id = []byte{0x01, 0x02, 0x03}
+	proposal.Header.RcLimit = 10
+	return proposal, nil
 }
