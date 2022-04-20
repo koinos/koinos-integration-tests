@@ -53,6 +53,10 @@ func TestGovernance(t *testing.T) {
 	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x531d5d4e), uint32(chain.SystemCallId_pre_block_callback))
 	integration.NoError(t, err)
 
+	t.Logf("Overriding require_system_authority system call")
+	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x279b51fa), uint32(chain.SystemCallId_require_system_authority))
+	integration.NoError(t, err)
+
 	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
 	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
 	integration.NoError(t, err)
@@ -457,7 +461,7 @@ func testLogOverrideProposal(client integration.Client, t *testing.T) error {
 }
 
 func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	genesisKey, err := integration.GetKey(integration.Genesis)
+	governanceKey, err := integration.GetKey(integration.Governance)
 	if err != nil {
 		return nil, err
 	}
@@ -507,5 +511,10 @@ func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, 
 		},
 	}
 
-	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, syscallOverrideKey, genesisKey)
+	mod := func(tx *protocol.Transaction) error {
+		tx.Header.Payer = governanceKey.AddressBytes()
+		return nil
+	}
+
+	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, mod, syscallOverrideKey)
 }
