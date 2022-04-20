@@ -11,7 +11,7 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -43,7 +43,10 @@ func TestGovernance(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	t.Logf("Uploading governance contract")
-	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey)
+	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, func(op *protocol.UploadContractOperation) error {
+		op.AuthorizesTransactionApplication = true
+		return nil
+	})
 	integration.NoError(t, err)
 
 	t.Logf("Overriding pre_block system call")
@@ -56,20 +59,358 @@ func TestGovernance(t *testing.T) {
 
 	integration.LogBlockReceipt(t, receipt)
 
-	testFailedProposal(t, client, CreateLogOverrideProposal, Standard)
-	testSuccessfulProposal(t, client, CreateLogOverrideProposal, Standard)
+	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
+	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
 }
 
-func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
+func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
 	}
 
+	aliceKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
-	governanceKey, err := integration.GetKey(integration.Governance)
+	t.Logf("Querying proposals")
+	gov := govUtil.GetGovernance(client)
+	proposals, err := gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+
+	t.Logf("Submitting proposal")
+	proposal, err := proposalFactory(client)
+	integration.NoError(t, err)
+
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents := integration.EventsFromBlockReceipt(receipt)
+
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by ID")
+	prec, err := gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.NotNil(t, prec, "Expected proposal from query")
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Pushing blocks to enter the voting period")
+
+	logPerK := func(b *protocol.Block) error {
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
+		return nil
+	}
+	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	var statusEvent governance.ProposalStatusEvent
+	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by ID")
+	prec, err = gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.NotNil(t, prec, "Expected proposal from query")
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	logAndVote := func(b *protocol.Block) error {
+		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
+		return nil
+	}
+
+	receipts, err := integration.CreateBlocks(client, (VotePeriod * threshold / 100), logAndVote, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+		require.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
+	}
+
+	receipts, err = integration.CreateBlocks(client, (VotePeriod*(100-threshold)/100)-1, logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		require.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
+	}
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_approved, "Proposal status mismatch")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
+	t.Logf("Status: " + proposals[0].Status.String())
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_approved)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
+
+	t.Logf("Querying proposals by ID")
+	prec, err = gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.NotNil(t, prec, "Expected proposal from query")
+
+	receipts, err = integration.CreateBlocks(client, ApplicationDelay-1, logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		require.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
+	}
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	require.EqualValues(t, 1, len(receipt.Events), "Expected 3 event within the block receipt")
+	require.EqualValues(t, "proposal.status", receipt.Events[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	err = proto.Unmarshal(receipt.Events[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_applied, "Proposal status mismatch")
+
+	err = onSuccess(client, t)
+	require.Nil(t, err)
+}
+
+func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
+	threshold := StandardThreshold
+	if proposalType == Governance {
+		threshold = GovernanceThreshold
+	}
+
+	aliceKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
+	genesisKey, err := integration.GetKey(integration.Genesis)
+	integration.NoError(t, err)
+
+	t.Logf("Querying proposals")
+	gov := govUtil.GetGovernance(client)
+	proposals, err := gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+
+	t.Logf("Submitting proposal")
+	proposal, err := proposalFactory(client)
+	integration.NoError(t, err)
+
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents := integration.EventsFromBlockReceipt(receipt)
+
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by ID")
+	prec, err := gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.NotNil(t, prec, "Expected proposal from query")
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Pushing blocks to enter the voting period")
+
+	logPerK := func(b *protocol.Block) error {
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
+		return nil
+	}
+	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	var statusEvent governance.ProposalStatusEvent
+	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
+	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	t.Logf("Querying proposals by ID")
+	prec, err = gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.NotNil(t, prec, "Expected proposal from query")
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+
+	logAndVote := func(b *protocol.Block) error {
+		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
+		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
+		return nil
+	}
+
+	receipts, err := integration.CreateBlocks(client, (VotePeriod*threshold/100)-1, logAndVote, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		integration.LogBlockReceipt(t, receipt)
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+		require.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
+	}
+
+	receipts, err = integration.CreateBlocks(client, (VotePeriod * (100 - threshold) / 100), logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		require.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
+	}
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_expired, "Proposal status mismatch")
+
+	t.Logf("Querying proposals")
+	proposals, err = gov.GetProposals()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+
+	t.Logf("Querying proposals by status")
+	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_expired)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+
+	t.Logf("Querying proposals by ID")
+	prec, err = gov.GetProposalById(proposal.Id)
+	integration.NoError(t, err)
+
+	require.Nil(t, prec, "Expected no proposal from query")
+}
+
+func testLogOverrideProposal(client integration.Client, t *testing.T) error {
+	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
 	t.Logf("Generating key for hello contract")
@@ -85,318 +426,86 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	integration.LogBlockReceipt(t, receipt)
 
-	t.Logf("Querying proposals")
-	gov := govUtil.GetGovernance(client)
-	proposals, err := gov.GetProposals()
+	t.Logf("Generating key for bob")
+	bobKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
+	callContract := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: helloKey.AddressBytes(),
+				EntryPoint: uint32(0x00),
+				Args:       make([]byte, 0),
+			},
+		},
+	}
 
-	t.Logf("Submitting proposal")
-	proposal, err := proposalFactory(client)
+	tx, err := integration.CreateTransaction(client, []*protocol.Operation{callContract}, bobKey)
 	integration.NoError(t, err)
 
-	receipt, err = gov.SubmitProposal(governanceKey, proposal, 100)
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
 
-	blockEvents := integration.EventsFromBlockReceipt(receipt)
+	t.Logf("Ensuring the log system call has been overridden")
+	require.EqualValues(t, len(receipt.TransactionReceipts), 1, "Expected 1 transaction receipt")
+	require.EqualValues(t, len(receipt.TransactionReceipts[0].Logs), 1, "Expected 1 log entry in transaction receipt")
+	require.EqualValues(t, receipt.TransactionReceipts[0].Logs[0], "test: Greetings from koinos vm", "Log entry mismatch")
 
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by ID")
-	prec, err := gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.NotNil(t, prec, "Expected proposal from query")
-	assert.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Pushing blocks to enter the voting period")
-
-	logPerK := func(b *protocol.Block) error {
-		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		return nil
-	}
-	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
-	integration.NoError(t, err)
-
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
-
-	blockEvents = integration.EventsFromBlockReceipt(receipt)
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
-
-	var statusEvent governance.ProposalStatusEvent
-	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
-	integration.NoError(t, err)
-
-	t.Logf("Ensuring the correct proposal status was emitted")
-	assert.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
-	assert.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.NotNil(t, prec, "Expected proposal from query")
-	assert.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	logAndVote := func(b *protocol.Block) error {
-		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
-		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		return nil
-	}
-
-	receipts, err := integration.CreateBlocks(client, (VotePeriod * threshold / 100), logAndVote, genesisKey)
-	integration.NoError(t, err)
-
-	for _, receipt := range receipts {
-		blockEvents = integration.EventsFromBlockReceipt(receipt)
-		assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-		assert.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
-	}
-
-	receipts, err = integration.CreateBlocks(client, (VotePeriod*(100-threshold)/100)-1, logPerK, genesisKey)
-	integration.NoError(t, err)
-
-	for _, receipt := range receipts {
-		blockEvents = integration.EventsFromBlockReceipt(receipt)
-		assert.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
-	}
-
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
-
-	blockEvents = integration.EventsFromBlockReceipt(receipt)
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
-
-	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
-	integration.NoError(t, err)
-
-	t.Logf("Ensuring the correct proposal status was emitted")
-	assert.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
-	assert.EqualValues(t, statusEvent.Status, governance.ProposalStatus_approved, "Proposal status mismatch")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
-	t.Logf("Status: " + proposals[0].Status.String())
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_approved)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
-
-	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.NotNil(t, prec, "Expected proposal from query")
+	return nil
 }
 
-func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
-	threshold := StandardThreshold
-	if proposalType == Governance {
-		threshold = GovernanceThreshold
-	}
-
+func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
 	genesisKey, err := integration.GetKey(integration.Genesis)
-	integration.NoError(t, err)
-
-	governanceKey, err := integration.GetKey(integration.Governance)
-	integration.NoError(t, err)
-
-	t.Logf("Querying proposals")
-	gov := govUtil.GetGovernance(client)
-	proposals, err := gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
-
-	t.Logf("Submitting proposal")
-	proposal, err := proposalFactory(client)
-	integration.NoError(t, err)
-
-	receipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
-
-	blockEvents := integration.EventsFromBlockReceipt(receipt)
-
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by ID")
-	prec, err := gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.NotNil(t, prec, "Expected proposal from query")
-	assert.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Pushing blocks to enter the voting period")
-
-	logPerK := func(b *protocol.Block) error {
-		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		return nil
-	}
-	_, err = integration.CreateBlocks(client, ReviewPeriod-1, logPerK, genesisKey)
-	integration.NoError(t, err)
-
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
-
-	blockEvents = integration.EventsFromBlockReceipt(receipt)
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
-
-	var statusEvent governance.ProposalStatusEvent
-	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
-	integration.NoError(t, err)
-
-	t.Logf("Ensuring the correct proposal status was emitted")
-	assert.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
-	assert.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	assert.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.NotNil(t, prec, "Expected proposal from query")
-	assert.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
-
-	logAndVote := func(b *protocol.Block) error {
-		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
-		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
-		return nil
+	if err != nil {
+		return nil, err
 	}
 
-	receipts, err := integration.CreateBlocks(client, (VotePeriod*threshold/100)-1, logAndVote, genesisKey)
-	integration.NoError(t, err)
-
-	for _, receipt := range receipts {
-		integration.LogBlockReceipt(t, receipt)
-		blockEvents = integration.EventsFromBlockReceipt(receipt)
-		assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-		assert.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
+	syscallOverrideKey, err := util.GenerateKoinosKey()
+	if err != nil {
+		return nil, err
 	}
 
-	receipts, err = integration.CreateBlocks(client, (VotePeriod * (100 - threshold) / 100), logPerK, genesisKey)
-	integration.NoError(t, err)
-
-	for _, receipt := range receipts {
-		blockEvents = integration.EventsFromBlockReceipt(receipt)
-		assert.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
+	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
+	if err != nil {
+		return nil, err
 	}
 
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
-	integration.NoError(t, err)
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = syscallOverrideKey.AddressBytes()
+	uco.Bytecode = wasm
 
-	integration.LogBlockReceipt(t, receipt)
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
 
-	blockEvents = integration.EventsFromBlockReceipt(receipt)
-	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+	setSysContractOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemContract{
+			SetSystemContract: &protocol.SetSystemContractOperation{
+				ContractId:     syscallOverrideKey.AddressBytes(),
+				SystemContract: true,
+			},
+		},
+	}
 
-	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
-	integration.NoError(t, err)
+	overrideOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_log),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_SystemCallBundle{
+						SystemCallBundle: &protocol.ContractCallBundle{
+							ContractId: syscallOverrideKey.AddressBytes(),
+							EntryPoint: uint32(0x00),
+						},
+					},
+				},
+			},
+		},
+	}
 
-	t.Logf("Ensuring the correct proposal status was emitted")
-	assert.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
-	assert.EqualValues(t, statusEvent.Status, governance.ProposalStatus_expired, "Proposal status mismatch")
-
-	t.Logf("Querying proposals")
-	proposals, err = gov.GetProposals()
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
-
-	t.Logf("Querying proposals by status")
-	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_expired)
-	integration.NoError(t, err)
-
-	assert.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
-
-	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
-	integration.NoError(t, err)
-
-	assert.Nil(t, prec, "Expected no proposal from query")
-}
-
-func CreateLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	proposal := &protocol.Transaction{}
-	proposal.Header = &protocol.TransactionHeader{}
-	proposal.Id = []byte{0x01, 0x02, 0x03}
-	proposal.Header.RcLimit = 10
-	return proposal, nil
+	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, syscallOverrideKey, genesisKey)
 }

@@ -26,7 +26,7 @@ import (
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -649,7 +649,13 @@ func UploadContractTransaction(client Client, file string, key *util.KoinosKey) 
 }
 
 // UploadSystemContract uploads a contract and sets it as a system contract
-func UploadSystemContract(client Client, file string, key *util.KoinosKey) error {
+func UploadSystemContract(client Client, file string, key *util.KoinosKey, mods ...func(b *protocol.UploadContractOperation) error) error {
+	var mod func(b *protocol.UploadContractOperation) error = nil
+
+	if len(mods) > 0 {
+		mod = mods[0]
+	}
+
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
 		return err
@@ -663,6 +669,13 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey) error
 		Op: &protocol.Operation_UploadContract{
 			UploadContract: &uco,
 		},
+	}
+
+	if mod != nil {
+		err = mod(uploadOperation.GetUploadContract())
+		if err != nil {
+			return err
+		}
 	}
 
 	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
@@ -731,7 +744,11 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 
 	for _, txReceipt := range blockReceipt.TransactionReceipts {
 		transactionID := base58.Encode(txReceipt.Id)
-		t.Logf(" > Transaction: " + transactionID)
+		if txReceipt.Reverted {
+			t.Logf(" > Transaction: " + transactionID + " (reverted)")
+		} else {
+			t.Logf(" > Transaction: " + transactionID)
+		}
 
 		if len(txReceipt.Logs) > 0 {
 			t.Logf("  * Logs")
@@ -767,5 +784,5 @@ func NoError(t *testing.T, err error) {
 		}
 	}
 
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

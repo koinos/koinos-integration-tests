@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	util "github.com/koinos/koinos-util-golang"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKoin(t *testing.T) {
@@ -20,7 +20,7 @@ func TestKoin(t *testing.T) {
 	bobKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
-	assert.NotEqualValues(t, aliceKey, bobKey)
+	require.NotEqualValues(t, aliceKey, bobKey)
 
 	koinKey, err := integration.GetKey(integration.Koin)
 	integration.NoError(t, err)
@@ -39,7 +39,7 @@ func TestKoin(t *testing.T) {
 	supply, err := koin.TotalSupply()
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, uint64(1000), supply)
+	require.EqualValues(t, uint64(1000), supply)
 
 	t.Logf("Transferring 500 satoshi from alice to bob")
 	err = koin.Transfer(aliceKey, bobKey.AddressBytes(), uint64(500))
@@ -49,7 +49,7 @@ func TestKoin(t *testing.T) {
 	supply, err = koin.TotalSupply()
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, uint64(1000), supply)
+	require.EqualValues(t, uint64(1000), supply)
 
 	t.Logf("Minting 500 satoshis to bob")
 	err = koin.Mint(bobKey.AddressBytes(), uint64(500))
@@ -59,17 +59,17 @@ func TestKoin(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring total supply is 1500")
-	assert.EqualValues(t, uint64(1500), supply)
+	require.EqualValues(t, uint64(1500), supply)
 
 	t.Logf("Asserting alice's balance is 500")
 	aliceBalance, err := koin.Balance(aliceKey.AddressBytes())
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, uint64(500), aliceBalance)
+	require.EqualValues(t, uint64(500), aliceBalance)
 
 	t.Logf("Asserting bob's balance is 1000")
 	bobBalance, err := koin.Balance(bobKey.AddressBytes())
 	integration.NoError(t, err)
 
-	assert.EqualValues(t, uint64(1000), bobBalance)
+	require.EqualValues(t, uint64(1000), bobBalance)
 }
