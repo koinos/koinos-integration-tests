@@ -60,7 +60,7 @@ func TestGovernance(t *testing.T) {
 	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
 }
 
-func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(t *testing.T) error) {
+func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
@@ -71,19 +71,6 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
-
-	t.Logf("Generating key for hello contract")
-	helloKey, err := util.GenerateKoinosKey()
-	integration.NoError(t, err)
-
-	t.Logf("Creating and uploading hello contract")
-	uploadTransaction, err := integration.UploadContractTransaction(client, "../../contracts/hello.wasm", helloKey)
-	integration.NoError(t, err)
-
-	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{uploadTransaction}, genesisKey)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
 
 	t.Logf("Querying proposals")
 	gov := govUtil.GetGovernance(client)
@@ -96,7 +83,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	proposal, err := proposalFactory(client)
 	integration.NoError(t, err)
 
-	receipt, err = gov.SubmitProposal(aliceKey, proposal, 100)
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -255,7 +242,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_applied, "Proposal status mismatch")
 
-	err = onSuccess(t)
+	err = onSuccess(client, t)
 	require.Nil(t, err)
 }
 
@@ -419,16 +406,54 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	require.Nil(t, prec, "Expected no proposal from query")
 }
 
-func testLogOverrideProposal(t *testing.T) error {
+func testLogOverrideProposal(client integration.Client, t *testing.T) error {
+	genesisKey, err := integration.GetKey(integration.Genesis)
+	integration.NoError(t, err)
+
+	t.Logf("Generating key for hello contract")
+	helloKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
+	t.Logf("Creating and uploading hello contract")
+	uploadTransaction, err := integration.UploadContractTransaction(client, "../../contracts/hello.wasm", helloKey)
+	integration.NoError(t, err)
+
+	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{uploadTransaction}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	t.Logf("Generating key for bob")
+	bobKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
+	callContract := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: helloKey.AddressBytes(),
+				EntryPoint: uint32(0x00),
+				Args:       make([]byte, 0),
+			},
+		},
+	}
+
+	tx, err := integration.CreateTransaction(client, []*protocol.Operation{callContract}, bobKey)
+	integration.NoError(t, err)
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	t.Logf("Ensuring the log system call has been overridden")
+	require.EqualValues(t, len(receipt.TransactionReceipts), 1, "Expected 1 transaction receipt")
+	require.EqualValues(t, len(receipt.TransactionReceipts[0].Logs), 1, "Expected 1 log entry in transaction receipt")
+	require.EqualValues(t, receipt.TransactionReceipts[0].Logs[0], "test: Greetings from koinos vm", "Log entry mismatch")
+
 	return nil
 }
 
 func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	//governanceKey, err := integration.GetKey(integration.Governance)
-	//if err != nil {
-	//	return nil, err
-	//}
-
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	if err != nil {
 		return nil, err
