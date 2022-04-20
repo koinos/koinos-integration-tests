@@ -438,17 +438,30 @@ func CreateBlocks(client Client, n int, vars ...interface{}) ([]*protocol.BlockR
 // CreateTransaction creates a transaction from a list of operations
 // Variadic arguments can be the following:
 //    mod func(b *protocol.Block) error - Modification callback function, called on each block
-func CreateTransaction(client Client, ops []*protocol.Operation, key *util.KoinosKey, vars ...func(b *protocol.Transaction) error) (*protocol.Transaction, error) {
-	var mod func(b *protocol.Transaction) error
+//    *util.KoinosKey - Key to sign the transaction with, the first key is used to retreive the nonce
+func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interface{}) (*protocol.Transaction, error) {
+	var mod func(b *protocol.Transaction) error = nil
+	keys := make([]*util.KoinosKey, 0)
 
 	if len(vars) > 0 {
-		mod = vars[0]
-	} else {
-		mod = nil
+		for _, v := range vars {
+			switch t := v.(type) {
+			case *util.KoinosKey:
+				keys = append(keys, t)
+			case func(b *protocol.Transaction) error:
+				mod = t
+			default:
+				return nil, fmt.Errorf("unexpected argument")
+			}
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("expected at least one key")
 	}
 
 	// Cache the public address
-	address := key.AddressBytes()
+	address := keys[0].AddressBytes()
 
 	// Fetch the account's nonce
 	nonce, err := GetAccountNonce(client, address)
@@ -514,10 +527,10 @@ func CreateTransaction(client Client, ops []*protocol.Operation, key *util.Koino
 	transaction.Id = tid
 
 	// Sign the transaction
-	err = util.SignTransaction(key.PrivateBytes(), transaction)
-
-	if err != nil {
-		return nil, err
+	for _, key := range keys {
+		if err := util.SignTransaction(key.PrivateBytes(), transaction); err != nil {
+			return nil, err
+		}
 	}
 
 	return transaction, nil
