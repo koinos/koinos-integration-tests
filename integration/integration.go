@@ -731,7 +731,11 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 
 	for _, txReceipt := range blockReceipt.TransactionReceipts {
 		transactionID := base58.Encode(txReceipt.Id)
-		t.Logf(" > Transaction: " + transactionID)
+		if txReceipt.Reverted {
+			t.Logf(" > Transaction: " + transactionID + " (reverted)")
+		} else {
+			t.Logf(" > Transaction: " + transactionID)
+		}
 
 		if len(txReceipt.Logs) > 0 {
 			t.Logf("  * Logs")
@@ -768,4 +772,7 @@ func NoError(t *testing.T, err error) {
 	}
 
 	assert.NoError(t, err)
+	if err != nil {
+		t.Fail()
+	}
 }

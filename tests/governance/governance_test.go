@@ -56,20 +56,20 @@ func TestGovernance(t *testing.T) {
 
 	integration.LogBlockReceipt(t, receipt)
 
-	testFailedProposal(t, client, CreateLogOverrideProposal, Standard)
-	testSuccessfulProposal(t, client, CreateLogOverrideProposal, Standard)
+	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
+	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
 }
 
-func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
+func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(t *testing.T) error) {
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
 	}
 
-	genesisKey, err := integration.GetKey(integration.Genesis)
+	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
-	governanceKey, err := integration.GetKey(integration.Governance)
+	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
 	t.Logf("Generating key for hello contract")
@@ -96,7 +96,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	proposal, err := proposalFactory(client)
 	integration.NoError(t, err)
 
-	receipt, err = gov.SubmitProposal(governanceKey, proposal, 100)
+	receipt, err = gov.SubmitProposal(aliceKey, proposal, 100)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -231,6 +231,33 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	assert.NotNil(t, prec, "Expected proposal from query")
+
+	receipts, err = integration.CreateBlocks(client, ApplicationDelay-1, logPerK, genesisKey)
+	integration.NoError(t, err)
+
+	for _, receipt := range receipts {
+		blockEvents = integration.EventsFromBlockReceipt(receipt)
+		assert.EqualValues(t, 0, len(blockEvents), "Expected no events within the block receipt")
+	}
+
+	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
+
+	blockEvents = integration.EventsFromBlockReceipt(receipt)
+	assert.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	assert.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+
+	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring the correct proposal status was emitted")
+	assert.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	assert.EqualValues(t, statusEvent.Status, governance.ProposalStatus_applied, "Proposal status mismatch")
+
+	err = onSuccess(t)
+	assert.Nil(t, err)
 }
 
 func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
@@ -239,10 +266,10 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 		threshold = GovernanceThreshold
 	}
 
-	genesisKey, err := integration.GetKey(integration.Genesis)
+	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
-	governanceKey, err := integration.GetKey(integration.Governance)
+	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
 	t.Logf("Querying proposals")
@@ -256,7 +283,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	proposal, err := proposalFactory(client)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(governanceKey, proposal, 100)
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -393,10 +420,60 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	assert.Nil(t, prec, "Expected no proposal from query")
 }
 
-func CreateLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	proposal := &protocol.Transaction{}
-	proposal.Header = &protocol.TransactionHeader{}
-	proposal.Id = []byte{0x01, 0x02, 0x03}
-	proposal.Header.RcLimit = 10
-	return proposal, nil
+func testLogOverrideProposal(t *testing.T) error {
+	return nil
+}
+
+func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
+	governanceKey, err := integration.GetKey(integration.Governance)
+	if err != nil {
+		return nil, err
+	}
+
+	syscallOverrideKey, err := util.GenerateKoinosKey()
+	if err != nil {
+		return nil, err
+	}
+
+	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
+	if err != nil {
+		return nil, err
+	}
+
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = syscallOverrideKey.AddressBytes()
+	uco.Bytecode = wasm
+
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
+
+	setSysContractOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemContract{
+			SetSystemContract: &protocol.SetSystemContractOperation{
+				ContractId:     syscallOverrideKey.AddressBytes(),
+				SystemContract: true,
+			},
+		},
+	}
+
+	overrideOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_log),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_SystemCallBundle{
+						SystemCallBundle: &protocol.ContractCallBundle{
+							ContractId: syscallOverrideKey.AddressBytes(),
+							EntryPoint: uint32(0x00),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, governanceKey)
 }
