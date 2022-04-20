@@ -29,7 +29,7 @@ function run_test() {
    if [ $? -ne 0 ];
    then
       echo "Failed during integration test: ${1}"
-      #docker-compose logs
+      docker-compose logs
       code=1
    fi
 

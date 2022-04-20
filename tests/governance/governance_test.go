@@ -43,7 +43,10 @@ func TestGovernance(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	t.Logf("Uploading governance contract")
-	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey)
+	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, func(op *protocol.UploadContractOperation) error {
+		op.AuthorizesTransactionApplication = true
+		return nil
+	})
 	integration.NoError(t, err)
 
 	t.Logf("Overriding pre_block system call")
