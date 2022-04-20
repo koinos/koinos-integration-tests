@@ -425,7 +425,12 @@ func testLogOverrideProposal(t *testing.T) error {
 }
 
 func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	governanceKey, err := integration.GetKey(integration.Governance)
+	//governanceKey, err := integration.GetKey(integration.Governance)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	genesisKey, err := integration.GetKey(integration.Genesis)
 	if err != nil {
 		return nil, err
 	}
@@ -475,5 +480,5 @@ func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, 
 		},
 	}
 
-	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, governanceKey)
+	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, syscallOverrideKey, genesisKey)
 }
