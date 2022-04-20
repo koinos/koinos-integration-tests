@@ -26,7 +26,7 @@ import (
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/multiformats/go-multihash"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -771,8 +771,5 @@ func NoError(t *testing.T, err error) {
 		}
 	}
 
-	assert.NoError(t, err)
-	if err != nil {
-		t.Fail()
-	}
+	require.NoError(t, err)
 }
