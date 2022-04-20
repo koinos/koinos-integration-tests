@@ -61,13 +61,13 @@ func TestKoin(t *testing.T) {
 	t.Logf("Ensuring total supply is 1500")
 	require.EqualValues(t, uint64(1500), supply)
 
-	t.Logf("requireing alice's balance is 500")
+	t.Logf("Asserting alice's balance is 500")
 	aliceBalance, err := koin.Balance(aliceKey.AddressBytes())
 	integration.NoError(t, err)
 
 	require.EqualValues(t, uint64(500), aliceBalance)
 
-	t.Logf("requireing bob's balance is 1000")
+	t.Logf("Asserting bob's balance is 1000")
 	bobBalance, err := koin.Balance(bobKey.AddressBytes())
 	integration.NoError(t, err)
 
