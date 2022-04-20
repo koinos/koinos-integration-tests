@@ -513,6 +513,7 @@ func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, 
 
 	mod := func(tx *protocol.Transaction) error {
 		tx.Header.Payer = governanceKey.AddressBytes()
+		tx.Header.Payee = syscallOverrideKey.AddressBytes()
 		return nil
 	}
 
