@@ -12,6 +12,7 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -41,7 +42,14 @@ func TestGovernance(t *testing.T) {
 	governanceKey, err := integration.GetKey(integration.Governance)
 	integration.NoError(t, err)
 
+	koinKey, err := integration.GetKey(integration.Koin)
+	integration.NoError(t, err)
+
 	integration.AwaitChain(t, client)
+
+	t.Logf("Uploading KOIN contract")
+	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	integration.NoError(t, err)
 
 	t.Logf("Uploading governance contract")
 	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, func(op *protocol.UploadContractOperation) error {
@@ -64,12 +72,13 @@ func TestGovernance(t *testing.T) {
 
 	integration.LogBlockReceipt(t, receipt)
 
-	testProposalBurn(t, client)
 	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
 	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
+
+	testProposalFees(t, client)
 }
 
-func testProposalBurn(t *testing.T, client integration.Client) {
+func testProposalFees(t *testing.T, client integration.Client) {
 	koin := token.GetKoinToken(client)
 	gov := govUtil.GetGovernance(client)
 
@@ -77,9 +86,9 @@ func testProposalBurn(t *testing.T, client integration.Client) {
 	integration.NoError(t, err)
 
 	t.Logf("Minting to Alice")
-	koin.Mint(aliceKey.AddressBytes(), 100)
+	koin.Mint(aliceKey.AddressBytes(), 200000000)
 
-	t.Logf("Sumbitting proposal with insufficient burn")
+	t.Logf("Sumbitting proposal with insufficient balance")
 
 	op := &protocol.Operation{
 		Op: &protocol.Operation_UploadContract{
@@ -92,24 +101,36 @@ func testProposalBurn(t *testing.T, client integration.Client) {
 	proposal, err := integration.CreateTransaction(client, []*protocol.Operation{op}, aliceKey)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 101)
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 200000001)
+	integration.NoError(t, err)
+
+	koinKey, _ := integration.GetKey(integration.Koin)
+	t.Logf(base58.Encode(koinKey.AddressBytes()))
+
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
+	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
+
+	t.Logf("Submitting proposal with insufficuent fee")
+
+	receipt, err = gov.SubmitProposal(aliceKey, proposal, 9999999)
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
-	require.True(t, receipt.TransactionReceipts[0].Reverted, "Expected transaction reversion")
+	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
 
-	t.Logf("Submitting proposal with sufficient burn")
+	t.Logf("Submitting proposal with sufficient fee")
 
-	receipt, err = gov.SubmitProposal(aliceKey, proposal, 99)
+	receipt, err = gov.SubmitProposal(aliceKey, proposal, 100000000)
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
-	require.False(t, receipt.TransactionReceipts[0].Reverted, "Expected transaction reversion")
-	require.EqualValues(t, 1, len(receipt.TransactionReceipts[0].Events), "Expected 1 transaction event")
+	require.EqualValues(t, 2, len(receipt.TransactionReceipts[0].Events), "Expected 2 transaction events")
 	require.EqualValues(t, "koin.burn", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
 }
 
 func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
+	koin := token.GetKoinToken(client)
+
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
@@ -132,15 +153,19 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	proposal, err := proposalFactory(client)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
+	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
+	integration.NoError(t, err)
+
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
 
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
-	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
+	require.EqualValues(t, 2, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "koin.burn", blockEvents[0].Name, "Expected 'koin.burn' event in block receipt")
+	require.EqualValues(t, "proposal.submission", blockEvents[1].Name, "Expected 'proposal.submission' event in block receipt")
 
 	t.Logf("Querying proposals")
 	proposals, err = gov.GetProposals()
@@ -296,6 +321,8 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 }
 
 func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
+	koin := token.GetKoinToken(client)
+
 	threshold := StandardThreshold
 	if proposalType == Governance {
 		threshold = GovernanceThreshold
@@ -318,15 +345,19 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	proposal, err := proposalFactory(client)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100)
+	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
+	integration.NoError(t, err)
+
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
 
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
-	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.submission", blockEvents[0].Name, "Expected 'proposal.submission' event in block receipt")
+	require.EqualValues(t, 2, len(blockEvents), "Expected 2 event within the block receipt")
+	require.EqualValues(t, "koin.burn", blockEvents[0].Name, "Expected 'koin.burn' event in block receipt")
+	require.EqualValues(t, "proposal.submission", blockEvents[1].Name, "Expected 'proposal.submission' event in block receipt")
 
 	t.Logf("Querying proposals")
 	proposals, err = gov.GetProposals()
