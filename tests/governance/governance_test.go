@@ -65,6 +65,9 @@ func TestGovernance(t *testing.T) {
 
 	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
 	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
+
+	testFailedProposal(t, client, makeGovernanceRemovalProposal, Governance)
+	testSuccessfulProposal(t, client, makeGovernanceRemovalProposal, Governance, testGovernanceRemovalProposal)
 }
 
 func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
@@ -518,4 +521,63 @@ func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, 
 	}
 
 	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, mod, syscallOverrideKey)
+}
+
+func testGovernanceRemovalProposal(client integration.Client, t *testing.T) error {
+	genesisKey, err := integration.GetKey(integration.Genesis)
+	integration.NoError(t, err)
+
+	t.Logf("Pushing block to ensure pre_block system no longer emits logs")
+	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, len(receipt.Logs), 0, "Expected no log entries")
+
+	return nil
+}
+
+func makeGovernanceRemovalProposal(client integration.Client) (*protocol.Transaction, error) {
+	governanceKey, err := integration.GetKey(integration.Governance)
+	if err != nil {
+		return nil, err
+	}
+
+	proposerKey, err := util.GenerateKoinosKey()
+	if err != nil {
+		return nil, err
+	}
+
+	overridePreBlockOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_pre_block_callback),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_ThunkId{
+						ThunkId: uint32(chain.SystemCallId_pre_block_callback),
+					},
+				},
+			},
+		},
+	}
+
+	overrideRequireSystemAuthorityOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_require_system_authority),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_ThunkId{
+						ThunkId: uint32(chain.SystemCallId_require_system_authority),
+					},
+				},
+			},
+		},
+	}
+
+	mod := func(tx *protocol.Transaction) error {
+		tx.Header.Payer = governanceKey.AddressBytes()
+		tx.Header.Payee = proposerKey.AddressBytes()
+		return nil
+	}
+
+	return integration.CreateTransaction(client, []*protocol.Operation{overridePreBlockOperation, overrideRequireSystemAuthorityOperation}, mod, proposerKey)
 }
