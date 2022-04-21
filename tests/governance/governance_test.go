@@ -3,6 +3,7 @@ package governance
 import (
 	"koinos-integration-tests/integration"
 	govUtil "koinos-integration-tests/integration/governance"
+	"koinos-integration-tests/integration/token"
 	"strconv"
 	"testing"
 
@@ -63,8 +64,49 @@ func TestGovernance(t *testing.T) {
 
 	integration.LogBlockReceipt(t, receipt)
 
+	testProposalBurn(t, client)
 	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
 	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
+}
+
+func testProposalBurn(t *testing.T, client integration.Client) {
+	koin := token.GetKoinToken(client)
+	gov := govUtil.GetGovernance(client)
+
+	aliceKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+
+	t.Logf("Minting to Alice")
+	koin.Mint(aliceKey.AddressBytes(), 100)
+
+	t.Logf("Sumbitting proposal with insufficient burn")
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &protocol.UploadContractOperation{
+				ContractId: aliceKey.AddressBytes(),
+			},
+		},
+	}
+
+	proposal, err := integration.CreateTransaction(client, []*protocol.Operation{op}, aliceKey)
+	integration.NoError(t, err)
+
+	receipt, err := gov.SubmitProposal(aliceKey, proposal, 101)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
+	require.True(t, receipt.TransactionReceipts[0].Reverted, "Expected transaction reversion")
+
+	t.Logf("Submitting proposal with sufficient burn")
+
+	receipt, err = gov.SubmitProposal(aliceKey, proposal, 99)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
+	require.False(t, receipt.TransactionReceipts[0].Reverted, "Expected transaction reversion")
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts[0].Events), "Expected 1 transaction event")
+	require.EqualValues(t, "koin.burn", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
 }
 
 func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
