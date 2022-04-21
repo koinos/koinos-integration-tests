@@ -109,6 +109,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
@@ -116,6 +121,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by ID")
 	prec, err := gov.GetProposalById(proposal.Id)
@@ -123,6 +133,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.NotNil(t, prec, "Expected proposal from query")
 	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, prec.UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Pushing blocks to enter the voting period")
 
@@ -156,6 +171,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
@@ -163,6 +183,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by ID")
 	prec, err = gov.GetProposalById(proposal.Id)
@@ -170,6 +195,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	require.NotNil(t, prec, "Expected proposal from query")
 	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, prec.UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	logAndVote := func(b *protocol.Block) error {
 		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
@@ -215,19 +245,35 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
-	t.Logf("Status: " + proposals[0].Status.String())
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_approved)
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
+	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by ID")
 	prec, err = gov.GetProposalById(proposal.Id)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
+	if proposalType == Governance {
+		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, prec.UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	receipts, err = integration.CreateBlocks(client, ApplicationDelay-1, logPerK, genesisKey)
 	integration.NoError(t, err)
@@ -295,6 +341,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_pending)
@@ -302,6 +353,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by ID")
 	prec, err := gov.GetProposalById(proposal.Id)
@@ -309,6 +365,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.NotNil(t, prec, "Expected proposal from query")
 	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, prec.UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Pushing blocks to enter the voting period")
 
@@ -342,6 +403,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by status")
 	proposals, err = gov.GetProposalsByStatus(governance.ProposalStatus_active)
@@ -349,6 +415,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
 	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, proposals[0].UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	t.Logf("Querying proposals by ID")
 	prec, err = gov.GetProposalById(proposal.Id)
@@ -356,6 +427,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	require.NotNil(t, prec, "Expected proposal from query")
 	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	if proposalType == Governance {
+		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
+	} else {
+		require.EqualValues(t, prec.UpdatesGovernance, false, "Governance update mismatch")
+	}
 
 	logAndVote := func(b *protocol.Block) error {
 		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
