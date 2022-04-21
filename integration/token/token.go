@@ -15,6 +15,7 @@ const (
 	balanceOfEntry   uint32 = 0x5c721497
 	totalSupplyEntry uint32 = 0xb0da3934
 	transferEntry    uint32 = 0x27f576ca
+	burnEntry        uint32 = 0x859facc5
 )
 
 // Token interfaces with a token contract
@@ -114,6 +115,37 @@ func (t *Token) Transfer(from *util.KoinosKey, to []byte, value uint64) error {
 			CallContract: &protocol.CallContractOperation{
 				ContractId: t.contractAddress,
 				EntryPoint: transferEntry,
+				Args:       args,
+			},
+		},
+	}
+
+	transaction, err := integration.CreateTransaction(t.client, []*protocol.Operation{op}, from)
+	if err != nil {
+		return err
+	}
+
+	_, err = integration.CreateBlock(t.client, []*protocol.Transaction{transaction})
+	return err
+}
+
+// Burn tokens from an address
+func (t *Token) Burn(from *util.KoinosKey, value uint64) error {
+	burnArgs := &token.BurnArguments{
+		From:  from.AddressBytes(),
+		Value: value,
+	}
+
+	args, err := proto.Marshal(burnArgs)
+	if err != nil {
+		return err
+	}
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: t.contractAddress,
+				EntryPoint: burnEntry,
 				Args:       args,
 			},
 		},

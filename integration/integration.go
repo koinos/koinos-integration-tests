@@ -500,14 +500,8 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 		return nil, err
 	}
 
-	// Create the header
-	header := protocol.TransactionHeader{ChainId: chainID, RcLimit: rcLimit, Nonce: nonceBytes, OperationMerkleRoot: merkleRoot, Payer: address}
-	headerBytes, err := canonical.Marshal(&header)
-	if err != nil {
-		return nil, err
-	}
-
 	// Create the transaction
+	header := protocol.TransactionHeader{ChainId: chainID, RcLimit: rcLimit, Nonce: nonceBytes, OperationMerkleRoot: merkleRoot, Payer: address}
 	transaction := &protocol.Transaction{Header: &header, Operations: ops}
 
 	if mod != nil {
@@ -517,6 +511,11 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 	}
 
 	// Calculate the transaction ID
+	headerBytes, err := canonical.Marshal(&header)
+	if err != nil {
+		return nil, err
+	}
+
 	sha256Hasher := sha256.New()
 	sha256Hasher.Write(headerBytes)
 	tid, err := multihash.Encode(sha256Hasher.Sum(nil), multihash.SHA2_256)
