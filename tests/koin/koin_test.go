@@ -72,4 +72,21 @@ func TestKoin(t *testing.T) {
 	integration.NoError(t, err)
 
 	require.EqualValues(t, uint64(1000), bobBalance)
+
+	t.Logf("Burning 100 satoshi from bob's balance")
+
+	err = koin.Burn(bobKey, uint64(100))
+	integration.NoError(t, err)
+
+	t.Logf("Ensuring total supply is 1400")
+	supply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1400), supply)
+
+	t.Logf("Asserting bob'b balance is 900")
+	bobBalance, err = koin.Balance(bobKey.AddressBytes())
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(900), bobBalance)
 }
