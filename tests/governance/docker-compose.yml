@@ -4,6 +4,8 @@ volumes:
 services:
    amqp:
       image: rabbitmq:alpine
+      ports:
+        - "5672:5672"
 
    node_config:
     build:
@@ -19,7 +21,7 @@ services:
          - config_volume:/root/.koinos
       depends_on:
          - node_config
-      command: -a amqp://guest:guest@amqp:5672/ -l /tcp/8080 --log-level debug
+      command: -a amqp://guest:guest@amqp:5672/ -l /tcp/8080
 
    mempool:
       image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
@@ -36,15 +38,3 @@ services:
       depends_on:
          - node_config
       command: -a amqp://guest:guest@amqp:5672/
-
-   p2p:
-      image: koinos/koinos-p2p:${P2P_TAG:-latest}
-      command: -a amqp://guest:guest@amqp:5672/ -s bucket_brigade
-
-   block_producer:
-      image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
-      volumes:
-         - config_volume:/root/.koinos
-      depends_on:
-         - node_config
-      command: -a amqp://guest:guest@amqp:5672/ --algorithm=federated --gossip-production=false

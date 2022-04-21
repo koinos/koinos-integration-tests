@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
-	"log"
 	"testing"
 	"time"
 
@@ -15,12 +14,6 @@ import (
 )
 
 func TestBucketBrigade(t *testing.T) {
-	kill_timer := time.NewTimer(10 * time.Minute)
-	go func() {
-		<-kill_timer.C
-		panic("Timer expired")
-	}()
-
 	producerClient := jsonrpc.NewClient("http://localhost:8080/")
 	endClient := jsonrpc.NewClient("http://localhost:8082/")
 
@@ -46,7 +39,7 @@ func TestBucketBrigade(t *testing.T) {
 		time.Sleep(time.Second)
 	}
 
-	log.Print("Starting test...")
+	t.Logf("Starting test...")
 
 	test_timer := time.NewTimer(120 * time.Second)
 	go func() {
@@ -68,7 +61,7 @@ func TestBucketBrigade(t *testing.T) {
 				t.Error(err)
 			}
 
-			log.Printf("Producer Height %d", headInfoResponse.HeadTopology.Height)
+			t.Logf("Producer Height %d", headInfoResponse.HeadTopology.Height)
 
 			if headInfoResponse.HeadTopology.Height > 5 {
 				break
@@ -94,7 +87,7 @@ func TestBucketBrigade(t *testing.T) {
 				t.Error(err)
 			}
 
-			log.Printf("Bucket2 Height %d", endHeadInfoResponse.HeadTopology.Height)
+			t.Logf("Bucket2 Height %d", endHeadInfoResponse.HeadTopology.Height)
 
 			if endHeadInfoResponse.HeadTopology.Height >= headInfoResponse.HeadTopology.Height {
 				break
@@ -113,6 +106,9 @@ func TestBucketBrigade(t *testing.T) {
 	}
 
 	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
 	response, err := endClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
@@ -141,7 +137,7 @@ func TestBucketBrigade(t *testing.T) {
 
 	blockItem := getBlocksByHeightResponse.BlockItems[0]
 
-	if bytes.Compare(headInfoResponse.HeadTopology.Id, blockItem.BlockId) != 0 {
+	if !bytes.Equal(headInfoResponse.HeadTopology.Id, blockItem.BlockId) {
 		t.Errorf("Head block IDs do not match, (%s, %s)", hex.EncodeToString(headInfoResponse.HeadTopology.Id), hex.EncodeToString(blockItem.BlockId))
 	}
 }

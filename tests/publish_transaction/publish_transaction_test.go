@@ -16,12 +16,6 @@ import (
 )
 
 func TestPublishTransaction(t *testing.T) {
-	kill_timer := time.NewTimer(10 * time.Minute)
-	go func() {
-		<-kill_timer.C
-		panic("Timer expired")
-	}()
-
 	rpcClient := jsonrpc.NewClient("http://localhost:8080/")
 
 	headInfoResponse := chain.GetHeadInfoResponse{}
@@ -92,7 +86,7 @@ func TestPublishTransaction(t *testing.T) {
 		},
 	}
 
-	id, err := krpc.SubmitTransaction(ops, key)
+	txReceipt, err := krpc.SubmitTransaction(ops, key, &kjsonrpc.SubmissionParams{Nonce: 0, RCLimit: 0})
 
 	if err != nil {
 		t.Error(err)
@@ -128,6 +122,9 @@ func TestPublishTransaction(t *testing.T) {
 		ReturnReceipt:       false,
 	}
 	blocksReq, err := kjson.Marshal(&getBlocksByHeightRequest)
+	if err != nil {
+		t.Error(err)
+	}
 
 	response, err := rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
@@ -170,7 +167,7 @@ func TestPublishTransaction(t *testing.T) {
 
 	trx := blockItem.Block.Transactions[0]
 
-	if bytes.Compare(trx.Id, id) != 0 {
+	if !bytes.Equal(trx.Id, txReceipt.Id) {
 		t.Errorf("Unexpected transaction id")
 	}
 }
