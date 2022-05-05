@@ -63,7 +63,7 @@ func TestGovernance(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Overriding require_system_authority system call")
-	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x279b51fa), uint32(chain.SystemCallId_require_system_authority))
+	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0xa88d06c9), uint32(chain.SystemCallId_check_system_authority))
 	integration.NoError(t, err)
 
 	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
