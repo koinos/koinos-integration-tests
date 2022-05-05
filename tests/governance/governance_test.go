@@ -709,13 +709,13 @@ func makeGovernanceRemovalProposal(client integration.Client) (*protocol.Transac
 		},
 	}
 
-	overrideRequireSystemAuthorityOperation := &protocol.Operation{
+	overrideCheckSystemAuthorityOperation := &protocol.Operation{
 		Op: &protocol.Operation_SetSystemCall{
 			SetSystemCall: &protocol.SetSystemCallOperation{
-				CallId: uint32(chain.SystemCallId_require_system_authority),
+				CallId: uint32(chain.SystemCallId_check_system_authority),
 				Target: &protocol.SystemCallTarget{
 					Target: &protocol.SystemCallTarget_ThunkId{
-						ThunkId: uint32(chain.SystemCallId_require_system_authority),
+						ThunkId: uint32(chain.SystemCallId_check_system_authority),
 					},
 				},
 			},
@@ -728,5 +728,5 @@ func makeGovernanceRemovalProposal(client integration.Client) (*protocol.Transac
 		return nil
 	}
 
-	return integration.CreateTransaction(client, []*protocol.Operation{overridePreBlockOperation, overrideRequireSystemAuthorityOperation}, mod, proposerKey)
+	return integration.CreateTransaction(client, []*protocol.Operation{overridePreBlockOperation, overrideCheckSystemAuthorityOperation}, mod, proposerKey)
 }
