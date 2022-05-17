@@ -31,10 +31,11 @@ func GetGovernance(client integration.Client) *Governance {
 }
 
 // SubmitProposal to the goverance contract
-func (g *Governance) SubmitProposal(payer *util.KoinosKey, trx *protocol.Transaction, fee uint64) (*protocol.BlockReceipt, error) {
+func (g *Governance) SubmitProposal(payer *util.KoinosKey, mroot []byte, ops []*protocol.Operation, fee uint64) (*protocol.BlockReceipt, error) {
 	submitProposalArgs := &governance.SubmitProposalArguments{
-		Proposal: trx,
-		Fee:      fee,
+		Operations:          ops,
+		OperationMerkleRoot: mroot,
+		Fee:                 fee,
 	}
 
 	args, err := proto.Marshal(submitProposalArgs)

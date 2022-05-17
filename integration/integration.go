@@ -785,3 +785,23 @@ func NoError(t *testing.T, err error) {
 
 	require.NoError(t, err)
 }
+
+func CalculateOperationMerkleRoot(ops []*protocol.Operation) ([]byte, error) {
+	// Get operation multihashes
+	opHashes := make([][]byte, len(ops))
+	for i, op := range ops {
+		hash, err := util.HashMessage(op)
+		if err != nil {
+			return nil, err
+		}
+		opHashes[i] = hash
+	}
+
+	// Find merkle root
+	merkleRoot, err := util.CalculateMerkleRoot(opHashes)
+	if err != nil {
+		return nil, err
+	}
+
+	return merkleRoot, nil
+}
