@@ -177,10 +177,10 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	mroot, ops, err := proposalFactory(t, client)
 	integration.NoError(t, err)
 
-	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
+	err = koin.Mint(aliceKey.AddressBytes(), 20000000000)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 100000000)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 10000000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
