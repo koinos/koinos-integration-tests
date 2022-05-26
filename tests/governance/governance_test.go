@@ -1,20 +1,17 @@
 package governance
 
 import (
-	"encoding/base64"
 	"koinos-integration-tests/integration"
 	govUtil "koinos-integration-tests/integration/governance"
 	"koinos-integration-tests/integration/token"
 	"strconv"
 	"testing"
 
-	"github.com/koinos/koinos-proto-golang/koinos/canonical"
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
-	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -60,12 +57,19 @@ func TestGovernance(t *testing.T) {
 	})
 	integration.NoError(t, err)
 
+	maxRc, err := integration.GetAccountRc(client, governanceKey.AddressBytes())
+	t.Logf("Governance max RC: %d", maxRc)
+
 	t.Logf("Overriding pre_block system call")
 	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x531d5d4e), uint32(chain.SystemCallId_pre_block_callback))
 	integration.NoError(t, err)
 
-	t.Logf("Overriding require_system_authority system call")
+	t.Logf("Overriding check_system_authority system call")
 	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0xa88d06c9), uint32(chain.SystemCallId_check_system_authority))
+	integration.NoError(t, err)
+
+	t.Logf("Overriding get_account_rc system call")
+	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
 
 	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
@@ -90,8 +94,18 @@ func testProposalFees(t *testing.T, client integration.Client) {
 	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
+	totalSupply, err := koin.TotalSupply()
+	integration.NoError(t, err)
+
+	t.Logf("KOIN supply: %d", totalSupply)
+
 	t.Logf("Minting to Alice")
 	koin.Mint(aliceKey.AddressBytes(), 200000000)
+
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	t.Logf("KOIN supply: %d", totalSupply)
 
 	t.Logf("Submitting proposal with insufficient balance")
 
@@ -103,30 +117,35 @@ func testProposalFees(t *testing.T, client integration.Client) {
 		},
 	}
 
-	mroot, err := integration.CalculateOperationMerkleRoot([]*protocol.Operation{op})
+	ops := []*protocol.Operation{op}
+
+	mroot, err := integration.CalculateOperationMerkleRoot(ops)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, mroot, []*protocol.Operation{op}, 200000001)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 200000001)
 	integration.NoError(t, err)
 
-	koinKey, _ := integration.GetKey(integration.Koin)
-	t.Logf(base58.Encode(koinKey.AddressBytes()))
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
 
-	t.Logf("Submitting proposal with insufficuent fee")
+	t.Logf("Submitting proposal with insufficient fee")
 
-	receipt, err = gov.SubmitProposal(aliceKey, mroot, []*protocol.Operation{op}, 9999999)
+	receipt, err = gov.SubmitProposal(t, aliceKey, mroot, ops, totalSupply/MinProposalDenominator-1)
 	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
 
 	t.Logf("Submitting proposal with sufficient fee")
 
-	receipt, err = gov.SubmitProposal(aliceKey, mroot, []*protocol.Operation{op}, 100000000)
+	receipt, err = gov.SubmitProposal(t, aliceKey, mroot, ops, totalSupply/MinProposalDenominator)
 	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 2, len(receipt.TransactionReceipts[0].Events), "Expected 2 transaction events")
@@ -161,7 +180,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, mroot, ops, 100000000)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 100000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -399,7 +418,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, mroot, ops, 100000000)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 100000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -620,19 +639,9 @@ func makeLogOverrideProposal(t *testing.T, client integration.Client) ([]byte, [
 		return nil, nil, err
 	}
 
-	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
+	err = integration.UploadContract(client, "../../contracts/syscall_override.wasm", syscallOverrideKey)
 	if err != nil {
 		return nil, nil, err
-	}
-
-	uco := protocol.UploadContractOperation{}
-	uco.ContractId = syscallOverrideKey.AddressBytes()
-	uco.Bytecode = wasm
-
-	uploadOperation := &protocol.Operation{
-		Op: &protocol.Operation_UploadContract{
-			UploadContract: &uco,
-		},
 	}
 
 	setSysContractOperation := &protocol.Operation{
@@ -660,21 +669,7 @@ func makeLogOverrideProposal(t *testing.T, client integration.Client) ([]byte, [
 		},
 	}
 
-	ops := []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}
-
-	for i, op := range ops {
-		data, err := canonical.Marshal(op)
-		if err != nil {
-			panic(err)
-		}
-		t.Logf("Operation[%v]: %v", i, base64.StdEncoding.EncodeToString(data))
-
-		hash, err := util.HashMessage(op)
-		if err != nil {
-			return nil, nil, err
-		}
-		t.Logf("H(Operation[%v]): %v", i, base64.StdEncoding.EncodeToString(hash))
-	}
+	ops := []*protocol.Operation{setSysContractOperation, overrideOperation}
 
 	mroot, err := integration.CalculateOperationMerkleRoot(ops)
 	if err != nil {
@@ -725,20 +720,6 @@ func makeGovernanceRemovalProposal(t *testing.T, client integration.Client) ([]b
 	}
 
 	ops := []*protocol.Operation{overridePreBlockOperation, overrideCheckSystemAuthorityOperation}
-
-	for i, op := range ops {
-		data, err := canonical.Marshal(op)
-		if err != nil {
-			panic(err)
-		}
-		t.Logf("Operation[%v]: %v", i, base64.StdEncoding.EncodeToString(data))
-
-		hash, err := util.HashMessage(op)
-		if err != nil {
-			return nil, nil, err
-		}
-		t.Logf("H(Operation[%v]): %v", i, base64.StdEncoding.EncodeToString(hash))
-	}
 
 	mroot, err := integration.CalculateOperationMerkleRoot(ops)
 	if err != nil {

@@ -647,6 +647,45 @@ func UploadContractTransaction(client Client, file string, key *util.KoinosKey) 
 	return transaction, nil
 }
 
+// UploadContract uploads a contract
+func UploadContract(client Client, file string, key *util.KoinosKey, mods ...func(b *protocol.UploadContractOperation) error) error {
+	var mod func(b *protocol.UploadContractOperation) error = nil
+
+	if len(mods) > 0 {
+		mod = mods[0]
+	}
+
+	wasm, err := BytesFromFile(file, 512000)
+	if err != nil {
+		return err
+	}
+
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = key.AddressBytes()
+	uco.Bytecode = wasm
+
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
+
+	if mod != nil {
+		err = mod(uploadOperation.GetUploadContract())
+		if err != nil {
+			return err
+		}
+	}
+
+	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateBlock(client, []*protocol.Transaction{transaction1})
+	return err
+}
+
 // UploadSystemContract uploads a contract and sets it as a system contract
 func UploadSystemContract(client Client, file string, key *util.KoinosKey, mods ...func(b *protocol.UploadContractOperation) error) error {
 	var mod func(b *protocol.UploadContractOperation) error = nil
