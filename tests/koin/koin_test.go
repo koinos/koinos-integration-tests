@@ -84,7 +84,7 @@ func TestKoin(t *testing.T) {
 
 	require.EqualValues(t, uint64(1400), supply)
 
-	t.Logf("Asserting bob'b balance is 900")
+	t.Logf("Asserting bob's balance is 900")
 	bobBalance, err = koin.Balance(bobKey.AddressBytes())
 	integration.NoError(t, err)
 
