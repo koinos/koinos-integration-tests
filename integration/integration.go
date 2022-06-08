@@ -535,6 +535,22 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 	return transaction, nil
 }
 
+func SubmitTransaction(client Client, transaction *protocol.Transaction) (*protocol.TransactionReceipt, error) {
+
+	request := &chain.SubmitTransactionRequest{
+		Transaction: transaction,
+	}
+
+	response := chain.SubmitTransactionResponse{}
+
+	err := client.Call(SubmitTransactionCall, request, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Receipt, nil
+}
+
 // AwaitChain blocks until the chain rpc is responding
 func AwaitChain(t *testing.T, client Client) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
