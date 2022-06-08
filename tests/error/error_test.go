@@ -1,4 +1,4 @@
-package exception
+package error
 
 import (
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
