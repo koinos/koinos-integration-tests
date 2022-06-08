@@ -50,6 +50,7 @@ func TestError(t *testing.T) {
 	_, err = integration.SubmitTransaction(client, tx)
 	require.Error(t, err)
 
+	t.Logf("Ensuring the error message was propagated to the response")
 	require.EqualValues(t, err.Error(), "a reversion has occurred", "Unexpected error message")
 
 	t.Logf("Calling exit contract with failure")
@@ -74,5 +75,6 @@ func TestError(t *testing.T) {
 	_, err = integration.SubmitTransaction(client, tx)
 	require.Error(t, err)
 
+	t.Logf("Ensuring the error message was propagated to the response")
 	require.EqualValues(t, err.Error(), "a failure has occurred", "Unexpected error message")
 }
