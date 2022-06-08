@@ -18,19 +18,19 @@ func TestGovernance(t *testing.T) {
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
 
-	t.Logf("Generating key for hello contract")
+	t.Logf("Generating key for exit contract")
 	exitKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
 	integration.AwaitChain(t, client)
 
-	t.Logf("Uploading Exit contract")
+	t.Logf("Uploading exit contract")
 	err = integration.UploadSystemContract(client, "../../contracts/exit.wasm", exitKey)
 	integration.NoError(t, err)
 
-	t.Logf("Calling Exit contract with reversion")
+	t.Logf("Calling exit contract with reversion")
 
-	c := chain.Result{Code: 1}
+	c := chain.Result{Code: 1, Value: []byte("reversion")}
 	b, err := canonical.Marshal(&c)
 	require.NoError(t, err)
 
@@ -47,14 +47,12 @@ func TestGovernance(t *testing.T) {
 	tx, err := integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey)
 	integration.NoError(t, err)
 
-	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{tx})
+	_, err = integration.CreateBlock(client, []*protocol.Transaction{tx})
 	require.Error(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
 
 	t.Logf("Calling Exit contract with failure")
 
-	c = chain.Result{Code: -1}
+	c = chain.Result{Code: -1, Value: []byte("failure")}
 	b, err = canonical.Marshal(&c)
 	require.NoError(t, err)
 
@@ -71,8 +69,6 @@ func TestGovernance(t *testing.T) {
 	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey)
 	integration.NoError(t, err)
 
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{tx})
+	_, err = integration.CreateBlock(client, []*protocol.Transaction{tx})
 	require.Error(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
 }
