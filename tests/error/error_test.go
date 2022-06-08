@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-func TestGovernance(t *testing.T) {
+func TestError(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
@@ -30,9 +30,9 @@ func TestGovernance(t *testing.T) {
 
 	t.Logf("Calling exit contract with reversion")
 
-	c := chain.Result{Code: 1, Value: []byte("reversion")}
+	c := chain.Result{Code: 1, Value: []byte("a reversion has occurred")}
 	b, err := canonical.Marshal(&c)
-	require.NoError(t, err)
+	integration.NoError(t, err)
 
 	callContract := &protocol.Operation{
 		Op: &protocol.Operation_CallContract{
@@ -47,12 +47,14 @@ func TestGovernance(t *testing.T) {
 	tx, err := integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey)
 	integration.NoError(t, err)
 
-	_, err = integration.CreateBlock(client, []*protocol.Transaction{tx})
+	_, err = integration.SubmitTransaction(client, tx)
 	require.Error(t, err)
 
-	t.Logf("Calling Exit contract with failure")
+	require.EqualValues(t, err.Error(), "a reversion has occurred", "Unexpected error message")
 
-	c = chain.Result{Code: -1, Value: []byte("failure")}
+	t.Logf("Calling exit contract with failure")
+
+	c = chain.Result{Code: -1, Value: []byte("a failure has occurred")}
 	b, err = canonical.Marshal(&c)
 	require.NoError(t, err)
 
@@ -69,6 +71,8 @@ func TestGovernance(t *testing.T) {
 	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey)
 	integration.NoError(t, err)
 
-	_, err = integration.CreateBlock(client, []*protocol.Transaction{tx})
+	_, err = integration.SubmitTransaction(client, tx)
 	require.Error(t, err)
+
+	require.EqualValues(t, err.Error(), "a failure has occurred", "Unexpected error message")
 }
