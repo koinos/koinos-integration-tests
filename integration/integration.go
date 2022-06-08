@@ -535,6 +535,22 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 	return transaction, nil
 }
 
+func SubmitTransaction(client Client, transaction *protocol.Transaction) (*protocol.TransactionReceipt, error) {
+
+	request := &chain.SubmitTransactionRequest{
+		Transaction: transaction,
+	}
+
+	response := chain.SubmitTransactionResponse{}
+
+	err := client.Call(SubmitTransactionCall, request, &response)
+	if err != nil {
+		return nil, err
+	}
+
+	return response.Receipt, nil
+}
+
 // AwaitChain blocks until the chain rpc is responding
 func AwaitChain(t *testing.T, client Client) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
@@ -645,6 +661,45 @@ func UploadContractTransaction(client Client, file string, key *util.KoinosKey) 
 	}
 
 	return transaction, nil
+}
+
+// UploadContract uploads a contract
+func UploadContract(client Client, file string, key *util.KoinosKey, mods ...func(b *protocol.UploadContractOperation) error) error {
+	var mod func(b *protocol.UploadContractOperation) error = nil
+
+	if len(mods) > 0 {
+		mod = mods[0]
+	}
+
+	wasm, err := BytesFromFile(file, 512000)
+	if err != nil {
+		return err
+	}
+
+	uco := protocol.UploadContractOperation{}
+	uco.ContractId = key.AddressBytes()
+	uco.Bytecode = wasm
+
+	uploadOperation := &protocol.Operation{
+		Op: &protocol.Operation_UploadContract{
+			UploadContract: &uco,
+		},
+	}
+
+	if mod != nil {
+		err = mod(uploadOperation.GetUploadContract())
+		if err != nil {
+			return err
+		}
+	}
+
+	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateBlock(client, []*protocol.Transaction{transaction1})
+	return err
 }
 
 // UploadSystemContract uploads a contract and sets it as a system contract
@@ -784,4 +839,24 @@ func NoError(t *testing.T, err error) {
 	}
 
 	require.NoError(t, err)
+}
+
+func CalculateOperationMerkleRoot(ops []*protocol.Operation) ([]byte, error) {
+	// Get operation multihashes
+	opHashes := make([][]byte, len(ops))
+	for i, op := range ops {
+		hash, err := util.HashMessage(op)
+		if err != nil {
+			return nil, err
+		}
+		opHashes[i] = hash
+	}
+
+	// Find merkle root
+	merkleRoot, err := util.CalculateMerkleRoot(opHashes)
+	if err != nil {
+		return nil, err
+	}
+
+	return merkleRoot, nil
 }

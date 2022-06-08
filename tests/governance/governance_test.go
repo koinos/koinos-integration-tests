@@ -12,7 +12,6 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
-	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )
@@ -58,12 +57,19 @@ func TestGovernance(t *testing.T) {
 	})
 	integration.NoError(t, err)
 
+	maxRc, err := integration.GetAccountRc(client, governanceKey.AddressBytes())
+	t.Logf("Governance max RC: %d", maxRc)
+
 	t.Logf("Overriding pre_block system call")
 	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x531d5d4e), uint32(chain.SystemCallId_pre_block_callback))
 	integration.NoError(t, err)
 
-	t.Logf("Overriding require_system_authority system call")
-	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x279b51fa), uint32(chain.SystemCallId_require_system_authority))
+	t.Logf("Overriding check_system_authority system call")
+	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0xa88d06c9), uint32(chain.SystemCallId_check_system_authority))
+	integration.NoError(t, err)
+
+	t.Logf("Overriding get_account_rc system call")
+	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
 
 	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
@@ -88,10 +94,20 @@ func testProposalFees(t *testing.T, client integration.Client) {
 	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 
+	totalSupply, err := koin.TotalSupply()
+	integration.NoError(t, err)
+
+	t.Logf("KOIN supply: %d", totalSupply)
+
 	t.Logf("Minting to Alice")
 	koin.Mint(aliceKey.AddressBytes(), 200000000)
 
-	t.Logf("Sumbitting proposal with insufficient balance")
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	t.Logf("KOIN supply: %d", totalSupply)
+
+	t.Logf("Submitting proposal with insufficient balance")
 
 	op := &protocol.Operation{
 		Op: &protocol.Operation_UploadContract{
@@ -101,37 +117,42 @@ func testProposalFees(t *testing.T, client integration.Client) {
 		},
 	}
 
-	proposal, err := integration.CreateTransaction(client, []*protocol.Operation{op}, aliceKey)
+	ops := []*protocol.Operation{op}
+
+	mroot, err := integration.CalculateOperationMerkleRoot(ops)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 200000001)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 200000001)
 	integration.NoError(t, err)
 
-	koinKey, _ := integration.GetKey(integration.Koin)
-	t.Logf(base58.Encode(koinKey.AddressBytes()))
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
 
-	t.Logf("Submitting proposal with insufficuent fee")
+	t.Logf("Submitting proposal with insufficient fee")
 
-	receipt, err = gov.SubmitProposal(aliceKey, proposal, 9999999)
+	receipt, err = gov.SubmitProposal(t, aliceKey, mroot, ops, totalSupply/MinProposalDenominator-1)
 	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 0, len(receipt.TransactionReceipts[0].Events), "Expected 0 transaction events")
 
 	t.Logf("Submitting proposal with sufficient fee")
 
-	receipt, err = gov.SubmitProposal(aliceKey, proposal, 100000000)
+	receipt, err = gov.SubmitProposal(t, aliceKey, mroot, ops, totalSupply/MinProposalDenominator)
 	integration.NoError(t, err)
+
+	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 2, len(receipt.TransactionReceipts[0].Events), "Expected 2 transaction events")
 	require.EqualValues(t, "koin.burn", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
 }
 
-func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
+func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
 	koin := token.GetKoinToken(client)
 
 	threshold := StandardThreshold
@@ -153,13 +174,13 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
 
 	t.Logf("Submitting proposal")
-	proposal, err := proposalFactory(client)
+	mroot, ops, err := proposalFactory(t, client)
 	integration.NoError(t, err)
 
-	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
+	err = koin.Mint(aliceKey.AddressBytes(), 20000000000)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100000000)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 10000000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -175,7 +196,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -187,7 +208,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -195,11 +216,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	}
 
 	t.Logf("Querying proposals by ID")
-	prec, err := gov.GetProposalById(proposal.Id)
+	prec, err := gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -229,7 +250,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring the correct proposal status was emitted")
-	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Id, mroot, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
 
 	t.Logf("Querying proposals")
@@ -237,7 +258,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -249,7 +270,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -257,11 +278,11 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	}
 
 	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
+	prec, err = gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -269,7 +290,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	}
 
 	logAndVote := func(b *protocol.Block) error {
-		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
+		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, mroot)
 		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
@@ -304,7 +325,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring the correct proposal status was emitted")
-	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Id, mroot, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_approved, "Proposal status mismatch")
 
 	t.Logf("Querying proposals")
@@ -312,7 +333,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -324,7 +345,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected proposal when querying governance contract")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -332,7 +353,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	}
 
 	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
+	prec, err = gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
@@ -362,14 +383,14 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring the correct proposal status was emitted")
-	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Id, mroot, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_applied, "Proposal status mismatch")
 
 	err = onSuccess(client, t)
 	require.Nil(t, err)
 }
 
-func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(client integration.Client) (*protocol.Transaction, error), proposalType int) {
+func testFailedProposal(t *testing.T, client integration.Client, proposalFactory func(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error), proposalType int) {
 	koin := token.GetKoinToken(client)
 
 	threshold := StandardThreshold
@@ -391,13 +412,13 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
 
 	t.Logf("Submitting proposal")
-	proposal, err := proposalFactory(client)
+	mroot, ops, err := proposalFactory(t, client)
 	integration.NoError(t, err)
 
 	err = koin.Mint(aliceKey.AddressBytes(), 200000000)
 	integration.NoError(t, err)
 
-	receipt, err := gov.SubmitProposal(aliceKey, proposal, 100000000)
+	receipt, err := gov.SubmitProposal(t, aliceKey, mroot, ops, 100000000)
 	integration.NoError(t, err)
 
 	integration.LogBlockReceipt(t, receipt)
@@ -413,7 +434,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -425,7 +446,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -433,11 +454,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	}
 
 	t.Logf("Querying proposals by ID")
-	prec, err := gov.GetProposalById(proposal.Id)
+	prec, err := gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -467,7 +488,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring the correct proposal status was emitted")
-	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Id, mroot, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_active, "Proposal status mismatch")
 
 	t.Logf("Querying proposals")
@@ -475,7 +496,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -487,7 +508,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	require.EqualValues(t, 1, len(proposals), "Expected 1 proposal when querying governance contract")
-	require.EqualValues(t, proposals[0].Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, proposals[0].OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, proposals[0].UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -495,11 +516,11 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	}
 
 	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
+	prec, err = gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.NotNil(t, prec, "Expected proposal from query")
-	require.EqualValues(t, prec.Proposal.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, prec.OperationMerkleRoot, mroot, "Proposal ID mismatch")
 	if proposalType == Governance {
 		require.EqualValues(t, prec.UpdatesGovernance, true, "Governance update mismatch")
 	} else {
@@ -507,7 +528,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	}
 
 	logAndVote := func(b *protocol.Block) error {
-		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, proposal.Id)
+		b.Header.ApprovedProposals = append(b.Header.ApprovedProposals, mroot)
 		t.Logf("Created block at height: " + strconv.FormatUint(b.Header.Height, 10))
 		return nil
 	}
@@ -543,7 +564,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	integration.NoError(t, err)
 
 	t.Logf("Ensuring the correct proposal status was emitted")
-	require.EqualValues(t, statusEvent.Id, proposal.Id, "Proposal ID mismatch")
+	require.EqualValues(t, statusEvent.Id, mroot, "Proposal ID mismatch")
 	require.EqualValues(t, statusEvent.Status, governance.ProposalStatus_expired, "Proposal status mismatch")
 
 	t.Logf("Querying proposals")
@@ -559,7 +580,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	require.EqualValues(t, 0, len(proposals), "Expected no proposals when querying governance contract")
 
 	t.Logf("Querying proposals by ID")
-	prec, err = gov.GetProposalById(proposal.Id)
+	prec, err = gov.GetProposalById(mroot)
 	integration.NoError(t, err)
 
 	require.Nil(t, prec, "Expected no proposal from query")
@@ -612,30 +633,15 @@ func testLogOverrideProposal(client integration.Client, t *testing.T) error {
 	return nil
 }
 
-func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, error) {
-	governanceKey, err := integration.GetKey(integration.Governance)
-	if err != nil {
-		return nil, err
-	}
-
+func makeLogOverrideProposal(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error) {
 	syscallOverrideKey, err := util.GenerateKoinosKey()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	wasm, err := integration.BytesFromFile("../../contracts/syscall_override.wasm", 512000)
+	err = integration.UploadContract(client, "../../contracts/syscall_override.wasm", syscallOverrideKey)
 	if err != nil {
-		return nil, err
-	}
-
-	uco := protocol.UploadContractOperation{}
-	uco.ContractId = syscallOverrideKey.AddressBytes()
-	uco.Bytecode = wasm
-
-	uploadOperation := &protocol.Operation{
-		Op: &protocol.Operation_UploadContract{
-			UploadContract: &uco,
-		},
+		return nil, nil, err
 	}
 
 	setSysContractOperation := &protocol.Operation{
@@ -663,13 +669,14 @@ func makeLogOverrideProposal(client integration.Client) (*protocol.Transaction, 
 		},
 	}
 
-	mod := func(tx *protocol.Transaction) error {
-		tx.Header.Payer = governanceKey.AddressBytes()
-		tx.Header.Payee = syscallOverrideKey.AddressBytes()
-		return nil
+	ops := []*protocol.Operation{setSysContractOperation, overrideOperation}
+
+	mroot, err := integration.CalculateOperationMerkleRoot(ops)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return integration.CreateTransaction(client, []*protocol.Operation{uploadOperation, setSysContractOperation, overrideOperation}, mod, syscallOverrideKey)
+	return mroot, ops, nil
 }
 
 func testGovernanceRemovalProposal(client integration.Client, t *testing.T) error {
@@ -685,17 +692,7 @@ func testGovernanceRemovalProposal(client integration.Client, t *testing.T) erro
 	return nil
 }
 
-func makeGovernanceRemovalProposal(client integration.Client) (*protocol.Transaction, error) {
-	governanceKey, err := integration.GetKey(integration.Governance)
-	if err != nil {
-		return nil, err
-	}
-
-	proposerKey, err := util.GenerateKoinosKey()
-	if err != nil {
-		return nil, err
-	}
-
+func makeGovernanceRemovalProposal(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error) {
 	overridePreBlockOperation := &protocol.Operation{
 		Op: &protocol.Operation_SetSystemCall{
 			SetSystemCall: &protocol.SetSystemCallOperation{
@@ -709,24 +706,25 @@ func makeGovernanceRemovalProposal(client integration.Client) (*protocol.Transac
 		},
 	}
 
-	overrideRequireSystemAuthorityOperation := &protocol.Operation{
+	overrideCheckSystemAuthorityOperation := &protocol.Operation{
 		Op: &protocol.Operation_SetSystemCall{
 			SetSystemCall: &protocol.SetSystemCallOperation{
-				CallId: uint32(chain.SystemCallId_require_system_authority),
+				CallId: uint32(chain.SystemCallId_check_system_authority),
 				Target: &protocol.SystemCallTarget{
 					Target: &protocol.SystemCallTarget_ThunkId{
-						ThunkId: uint32(chain.SystemCallId_require_system_authority),
+						ThunkId: uint32(chain.SystemCallId_check_system_authority),
 					},
 				},
 			},
 		},
 	}
 
-	mod := func(tx *protocol.Transaction) error {
-		tx.Header.Payer = governanceKey.AddressBytes()
-		tx.Header.Payee = proposerKey.AddressBytes()
-		return nil
+	ops := []*protocol.Operation{overridePreBlockOperation, overrideCheckSystemAuthorityOperation}
+
+	mroot, err := integration.CalculateOperationMerkleRoot(ops)
+	if err != nil {
+		return nil, nil, err
 	}
 
-	return integration.CreateTransaction(client, []*protocol.Operation{overridePreBlockOperation, overrideRequireSystemAuthorityOperation}, mod, proposerKey)
+	return mroot, ops, nil
 }
