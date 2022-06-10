@@ -32,6 +32,7 @@ func TestError(t *testing.T) {
 
 	einfo := chain.ErrorInfo{Message: "a reversion has occurred"}
 	einfoBytes, err := canonical.Marshal(&einfo)
+	integration.NoError(t, err)
 
 	c := chain.Result{Code: 1, Value: einfoBytes}
 	b, err := canonical.Marshal(&c)
@@ -60,6 +61,7 @@ func TestError(t *testing.T) {
 
 	einfo.Message = "a failure has occurred"
 	einfoBytes, err = canonical.Marshal(&einfo)
+	integration.NoError(t, err)
 
 	c.Value = einfoBytes
 	b, err = canonical.Marshal(&c)
