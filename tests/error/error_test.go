@@ -30,7 +30,11 @@ func TestError(t *testing.T) {
 
 	t.Logf("Calling exit contract with reversion")
 
-	c := chain.Result{Code: 1, Value: []byte("a reversion has occurred")}
+	einfo := chain.ErrorInfo{Message: "a reversion has occurred"}
+	einfoBytes, err := canonical.Marshal(&einfo)
+	integration.NoError(t, err)
+
+	c := chain.Result{Code: 1, Value: einfoBytes}
 	b, err := canonical.Marshal(&c)
 	integration.NoError(t, err)
 
@@ -55,7 +59,11 @@ func TestError(t *testing.T) {
 
 	t.Logf("Calling exit contract with failure")
 
-	c = chain.Result{Code: -1, Value: []byte("a failure has occurred")}
+	einfo.Message = "a failure has occurred"
+	einfoBytes, err = canonical.Marshal(&einfo)
+	integration.NoError(t, err)
+
+	c.Value = einfoBytes
 	b, err = canonical.Marshal(&c)
 	require.NoError(t, err)
 
