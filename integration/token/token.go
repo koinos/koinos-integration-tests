@@ -36,6 +36,12 @@ func GetKoinToken(client integration.Client) *Token {
 	return &Token{key: koinKey, contractAddress: koinKey.AddressBytes(), client: client}
 }
 
+// GetVhpToken returns the VHP Token object
+func GetVhpToken(client integration.Client) *Token {
+	vhpKey, _ := integration.GetKey(integration.Vhp)
+	return &Token{key: vhpKey, contractAddress: vhpKey.AddressBytes(), client: client}
+}
+
 // Mint tokens to an address
 func (t *Token) Mint(to []byte, value uint64) error {
 	if t.key == nil {
