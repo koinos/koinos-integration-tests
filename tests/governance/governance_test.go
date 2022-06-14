@@ -1,6 +1,7 @@
 package governance
 
 import (
+	"encoding/hex"
 	"koinos-integration-tests/integration"
 	govUtil "koinos-integration-tests/integration/governance"
 	"koinos-integration-tests/integration/token"
@@ -12,7 +13,9 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/mr-tron/base58"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -35,56 +38,48 @@ const (
 func TestGovernance(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
-	genesisKey, err := integration.GetKey(integration.Genesis)
+	key, err := integration.KeyFromWIF("5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV")
+
+	t.Logf("Key: %s", base58.Encode(key.AddressBytes()))
+
+	governanceKey, err := integration.KeyFromWIF("5K5mYpx1bpnLhvKnJckiKxiCub5VpxMsVVcXNhEMSbN8x7JE7nQ")
 	integration.NoError(t, err)
 
-	governanceKey, err := integration.GetKey(integration.Governance)
-	integration.NoError(t, err)
-
-	koinKey, err := integration.GetKey(integration.Koin)
-	integration.NoError(t, err)
+	t.Logf("Governance Key: %s", base58.Encode(governanceKey.AddressBytes()))
 
 	integration.AwaitChain(t, client)
 
-	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	mroot, ops, err := makeGovernanceRemovalProposal(t, client)
+
+	t.Logf("Proposal ID: 0x%s", hex.EncodeToString(mroot))
+
+	submitProposalArgs := &governance.SubmitProposalArguments{
+		Operations:          ops,
+		OperationMerkleRoot: mroot,
+		Fee:                 500000000,
+	}
+
+	args, err := proto.Marshal(submitProposalArgs)
 	integration.NoError(t, err)
 
-	t.Logf("Uploading governance contract")
-	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, func(op *protocol.UploadContractOperation) error {
-		op.AuthorizesTransactionApplication = true
-		return nil
-	})
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: governanceKey.AddressBytes(),
+				EntryPoint: 0xe74b785c,
+				Args:       args,
+			},
+		},
+	}
+
+	transaction, err := integration.CreateTransaction(client, []*protocol.Operation{op}, key)
 	integration.NoError(t, err)
 
-	maxRc, err := integration.GetAccountRc(client, governanceKey.AddressBytes())
-	t.Logf("Governance max RC: %d", maxRc)
-
-	t.Logf("Overriding pre_block system call")
-	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0x531d5d4e), uint32(chain.SystemCallId_pre_block_callback))
+	receipt, err := integration.SubmitTransaction(client, transaction)
 	integration.NoError(t, err)
 
-	t.Logf("Overriding check_system_authority system call")
-	err = integration.SetSystemCallOverride(client, governanceKey, uint32(0xa88d06c9), uint32(chain.SystemCallId_check_system_authority))
-	integration.NoError(t, err)
-
-	t.Logf("Overriding get_account_rc system call")
-	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
-	integration.NoError(t, err)
-
-	t.Logf("Pushing block to ensure pre_block system call does not halt chain")
-	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
-	integration.NoError(t, err)
-
-	integration.LogBlockReceipt(t, receipt)
-
-	testFailedProposal(t, client, makeLogOverrideProposal, Standard)
-	testSuccessfulProposal(t, client, makeLogOverrideProposal, Standard, testLogOverrideProposal)
-
-	testFailedProposal(t, client, makeGovernanceRemovalProposal, Governance)
-	testSuccessfulProposal(t, client, makeGovernanceRemovalProposal, Governance, testGovernanceRemovalProposal)
-
-	testProposalFees(t, client)
+	str, err := prototext.Marshal(receipt)
+	t.Logf("Receipt: %s", string(str))
 }
 
 func testProposalFees(t *testing.T, client integration.Client) {
