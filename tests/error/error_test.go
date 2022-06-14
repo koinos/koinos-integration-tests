@@ -30,10 +30,16 @@ func TestError(t *testing.T) {
 
 	t.Logf("Calling exit contract with reversion")
 
-	einfo := chain.ErrorInfo{Message: "a reversion has occurred"}
-	einfoBytes, err := canonical.Marshal(&einfo)
-
-	c := chain.Result{Code: 1, Value: einfoBytes}
+	c := chain.ExitArguments{
+		Code: 1,
+		Res: &chain.Result{
+			Value: &chain.Result_Error{
+				Error: &chain.ErrorData{
+					Message: "a reversion has occurred",
+				},
+			},
+		},
+	}
 	b, err := canonical.Marshal(&c)
 	integration.NoError(t, err)
 
@@ -54,14 +60,20 @@ func TestError(t *testing.T) {
 	require.Error(t, err)
 
 	t.Logf("Ensuring the error message was propagated to the response")
-	require.EqualValues(t, err.Error(), "a reversion has occurred", "Unexpected error message")
+	require.EqualValues(t, "a reversion has occurred", err.Error(), "Unexpected error message")
 
 	t.Logf("Calling exit contract with failure")
 
-	einfo.Message = "a failure has occurred"
-	einfoBytes, err = canonical.Marshal(&einfo)
-
-	c.Value = einfoBytes
+	c = chain.ExitArguments{
+		Code: 1,
+		Res: &chain.Result{
+			Value: &chain.Result_Error{
+				Error: &chain.ErrorData{
+					Message: "a failure has occurred",
+				},
+			},
+		},
+	}
 	b, err = canonical.Marshal(&c)
 	require.NoError(t, err)
 
@@ -82,5 +94,5 @@ func TestError(t *testing.T) {
 	require.Error(t, err)
 
 	t.Logf("Ensuring the error message was propagated to the response")
-	require.EqualValues(t, err.Error(), "a failure has occurred", "Unexpected error message")
+	require.EqualValues(t, "a failure has occurred", err.Error(), "Unexpected error message")
 }
