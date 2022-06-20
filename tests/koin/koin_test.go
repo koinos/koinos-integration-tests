@@ -3,6 +3,7 @@ package koin
 import (
 	"koinos-integration-tests/integration"
 	"koinos-integration-tests/integration/token"
+	"math"
 	"testing"
 
 	util "github.com/koinos/koinos-util-golang"
@@ -37,6 +38,54 @@ func TestKoin(t *testing.T) {
 	integration.NoError(t, err)
 
 	supply, err := koin.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to transfer 1001 satoshi from alice to bob")
+	err = koin.Transfer(aliceKey, bobKey.AddressBytes(), uint64(1001))
+	integration.NoError(t, err)
+
+	balance, err := koin.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = koin.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to overflow 64-bit unsigned integer during mint")
+	err = koin.Mint(aliceKey.AddressBytes(), (math.MaxUint64-supply)+1)
+	integration.NoError(t, err)
+
+	balance, err = koin.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = koin.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to burn more than balance")
+	balance, err = koin.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	err = koin.Burn(aliceKey, balance+1)
+	integration.NoError(t, err)
+
+	balance, err = koin.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = koin.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = koin.TotalSupply()
 	integration.NoError(t, err)
 
 	require.EqualValues(t, uint64(1000), supply)

@@ -3,6 +3,7 @@ package vhp
 import (
 	"koinos-integration-tests/integration"
 	"koinos-integration-tests/integration/token"
+	"math"
 	"testing"
 
 	util "github.com/koinos/koinos-util-golang"
@@ -37,6 +38,54 @@ func TestVhp(t *testing.T) {
 	integration.NoError(t, err)
 
 	supply, err := vhp.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to transfer 1001 satoshi from alice to bob")
+	err = vhp.Transfer(aliceKey, bobKey.AddressBytes(), uint64(1001))
+	integration.NoError(t, err)
+
+	balance, err := vhp.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = vhp.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = vhp.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to overflow 64-bit unsigned integer during mint")
+	err = vhp.Mint(aliceKey.AddressBytes(), (math.MaxUint64-supply)+1)
+	integration.NoError(t, err)
+
+	balance, err = vhp.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = vhp.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = vhp.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, uint64(1000), supply)
+
+	t.Logf("Fail to burn more than balance")
+	balance, err = vhp.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	err = vhp.Burn(aliceKey, balance+1)
+	integration.NoError(t, err)
+
+	balance, err = vhp.Balance(aliceKey.AddressBytes())
+	require.EqualValues(t, uint64(1000), balance)
+
+	balance, err = vhp.Balance(bobKey.AddressBytes())
+	require.EqualValues(t, uint64(0), balance)
+
+	supply, err = vhp.TotalSupply()
 	integration.NoError(t, err)
 
 	require.EqualValues(t, uint64(1000), supply)
