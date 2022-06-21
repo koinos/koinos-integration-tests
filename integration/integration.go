@@ -39,6 +39,7 @@ const (
 	Genesis    int = 2
 	Resources  int = 3
 	Pow        int = 4
+	Vhp        int = 5
 )
 
 var wifMap = map[int]string{
@@ -47,6 +48,7 @@ var wifMap = map[int]string{
 	Genesis:    "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
 	Resources:  "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
 	Pow:        "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
+	Vhp:        "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
 }
 
 const (
