@@ -1,4 +1,4 @@
-package vhp
+package add_thunk
 
 import (
 	"koinos-integration-tests/integration"
