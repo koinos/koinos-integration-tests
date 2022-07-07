@@ -9,6 +9,7 @@ rsync -a -v --ignore-existing /koinos-config/genesis_data.json /koinos/chain/gen
 mkdir -p /koinos/block_producer
 mkdir -p /koinos/chain
 rsync -a -v --ignore-existing /koinos-config/private.key /koinos/block_producer/private.key
+rsync -a -v --ignore-existing /koinos-config/pob.key /koinos/block_producer/pob.key
 
 mkdir -p /koinos/jsonrpc/descriptors
 pushd /koinos/jsonrpc/descriptors

@@ -34,21 +34,25 @@ import (
 )
 
 const (
-	Governance int = 0
-	Koin       int = 1
-	Genesis    int = 2
-	Resources  int = 3
-	Pow        int = 4
-	Vhp        int = 5
+	Genesis int = iota
+	Governance
+	Koin
+	Pob
+	PobProducer
+	Pow
+	Resources
+	Vhp
 )
 
 var wifMap = map[int]string{
-	Governance: "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV",
-	Koin:       "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH",
-	Genesis:    "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
-	Resources:  "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
-	Pow:        "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
-	Vhp:        "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
+	Genesis:     "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
+	Governance:  "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV",
+	Koin:        "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH",
+	Pob:         "5JChmh7kJTLLToW7Et45w6fULWAq7S6USLYDaRydyE6aa42U557",
+	PobProducer: "5JMYdb7hMY78q3U2Yro6ZSJiYE7uvt9m6HBbeF8rA9fGEPD14US",
+	Pow:         "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
+	Resources:   "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
+	Vhp:         "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
 }
 
 const (
@@ -58,11 +62,25 @@ const (
 	SubmitTransactionCall = "chain.submit_transaction"
 	GetChainIDCall        = "chain.get_chain_id"
 	GetContractMetaCall   = "contract_meta_store.get_contract_meta"
+	GetHeadInfoCall       = "chain.get_head_info"
 )
 
 // Client is an interface for different types of message clients
 type Client interface {
 	Call(method string, params proto.Message, returnType proto.Message) error
+}
+
+// GetHeadInfo gets the head info of the chain
+func GetHeadInfo(client Client) (*chain.GetHeadInfoResponse, error) {
+	params := chain.GetHeadInfoRequest{}
+
+	headInfo := &chain.GetHeadInfoResponse{}
+	err := client.Call(GetHeadInfoCall, &params, headInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return headInfo, nil
 }
 
 // GetAccountNonce gets the nonce of a given account
@@ -323,12 +341,7 @@ func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...in
 	block := &protocol.Block{}
 	block.Header = &protocol.BlockHeader{}
 
-	headInfo := chain.GetHeadInfoResponse{}
-
-	err := client.Call("chain.get_head_info", &chain.GetHeadInfoRequest{}, &headInfo)
-	if err != nil {
-		return nil, err
-	}
+	headInfo, err := GetHeadInfo(client)
 
 	block.Header.Previous = headInfo.HeadTopology.GetId()
 	block.Header.Height = headInfo.HeadTopology.GetHeight() + 1
@@ -555,13 +568,11 @@ func SubmitTransaction(client Client, transaction *protocol.Transaction) (*proto
 
 // AwaitChain blocks until the chain rpc is responding
 func AwaitChain(t *testing.T, client Client) {
-	headInfoResponse := chain.GetHeadInfoResponse{}
-
 	var waitDuration int64 = 1
 	const maxRetry int64 = 5
 
 	for {
-		err := client.Call("chain.get_head_info", &chain.GetHeadInfoRequest{}, &headInfoResponse)
+		_, err := GetHeadInfo(client)
 		if err == nil {
 			break
 		}
