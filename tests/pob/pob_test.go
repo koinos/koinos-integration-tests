@@ -159,11 +159,11 @@ func TestPob(t *testing.T) {
 
 	endBlock := headInfo.HeadTopology.Height + 10
 
-	//test_timer := time.NewTimer(30 * time.Second)
-	//go func() {
-	//	<-test_timer.C
-	//	panic("Timer expired")
-	//}()
+	test_timer := time.NewTimer(30 * time.Second)
+	go func() {
+		<-test_timer.C
+		panic("Timer expired")
+	}()
 
 	for {
 		headInfo, err = integration.GetHeadInfo(client)
