@@ -86,7 +86,7 @@ func TestPublishTransaction(t *testing.T) {
 		},
 	}
 
-	txReceipt, err := krpc.SubmitTransaction(ops, key, &kjsonrpc.SubmissionParams{Nonce: 0, RCLimit: 0})
+	txReceipt, err := krpc.SubmitTransaction(ops, key, &kjsonrpc.SubmissionParams{Nonce: 0, RCLimit: 0}, true)
 
 	if err != nil {
 		t.Error(err)
