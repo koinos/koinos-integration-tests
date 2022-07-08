@@ -541,7 +541,7 @@ func SubmitTransaction(client Client, transaction *protocol.Transaction) (*proto
 
 	request := &chain.SubmitTransactionRequest{
 		Transaction: transaction,
-		Broadcast: true
+		Broadcast:   true,
 	}
 
 	response := chain.SubmitTransactionResponse{}
