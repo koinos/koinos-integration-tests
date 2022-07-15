@@ -103,6 +103,7 @@ func TestPob(t *testing.T) {
 
 	t.Logf("Register Public Key")
 	registerArgs := &pob.RegisterPublicKeyArguments{
+		Producer:  producerKey.AddressBytes(),
 		PublicKey: producerKey.PublicBytes(),
 	}
 
