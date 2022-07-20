@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -794,6 +795,9 @@ func EventsFromBlockReceipt(blockReceipt *protocol.BlockReceipt) []*protocol.Eve
 func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 	blockID := base58.Encode(blockReceipt.Id)
 	t.Logf("Block: " + blockID)
+	t.Logf("Compute: " + strconv.FormatUint(blockReceipt.ComputeBandwidthUsed, 10))
+	t.Logf("Disk: " + strconv.FormatUint(blockReceipt.DiskStorageUsed, 10))
+	t.Logf("Network: " + strconv.FormatUint(blockReceipt.NetworkBandwidthUsed, 10))
 
 	if len(blockReceipt.Logs) > 0 {
 		t.Logf(" * Logs")
@@ -818,6 +822,10 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 			t.Logf(" > Transaction: " + transactionID)
 		}
 
+		t.Logf("  * Compute: " + strconv.FormatUint(txReceipt.ComputeBandwidthUsed, 10))
+		t.Logf("  * Disk: " + strconv.FormatUint(txReceipt.DiskStorageUsed, 10))
+		t.Logf("  * Network: " + strconv.FormatUint(txReceipt.NetworkBandwidthUsed, 10))
+
 		if len(txReceipt.Logs) > 0 {
 			t.Logf("  * Logs")
 			for _, log := range txReceipt.Logs {
@@ -831,6 +839,35 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 				bytes := base64.StdEncoding.EncodeToString(event.Data)
 				t.Logf("   - " + event.Name + ": " + bytes)
 			}
+		}
+	}
+}
+
+// LogTransactionReceipt logs log messages contained within a transaction receipt
+func LogTransactionReceipt(t *testing.T, txReceipt *protocol.TransactionReceipt) {
+	transactionID := base58.Encode(txReceipt.Id)
+	if txReceipt.Reverted {
+		t.Logf("Transaction: " + transactionID + " (reverted)")
+	} else {
+		t.Logf("Transaction: " + transactionID)
+	}
+
+	t.Logf("Compute: " + strconv.FormatUint(txReceipt.ComputeBandwidthUsed, 10))
+	t.Logf("Disk: " + strconv.FormatUint(txReceipt.DiskStorageUsed, 10))
+	t.Logf("Network: " + strconv.FormatUint(txReceipt.NetworkBandwidthUsed, 10))
+
+	if len(txReceipt.Logs) > 0 {
+		t.Logf(" * Logs")
+		for _, log := range txReceipt.Logs {
+			t.Logf("   - " + log)
+		}
+	}
+
+	if len(txReceipt.Events) > 0 {
+		t.Logf(" * Events")
+		for _, event := range txReceipt.Events {
+			bytes := base64.StdEncoding.EncodeToString(event.Data)
+			t.Logf("   - " + event.Name + ": " + bytes)
 		}
 	}
 }

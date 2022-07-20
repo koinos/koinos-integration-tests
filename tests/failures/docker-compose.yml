@@ -1,0 +1,40 @@
+volumes:
+  config_volume:
+
+services:
+   amqp:
+      image: rabbitmq:alpine
+      ports:
+        - "5672:5672"
+
+   node_config:
+    build:
+      context: ../../node_config
+    volumes:
+      -  config_volume:/koinos
+
+   jsonrpc:
+      image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
+      ports:
+         - "8080:8080"
+      volumes:
+         - config_volume:/root/.koinos
+      depends_on:
+         - node_config
+      command: -a amqp://guest:guest@amqp:5672/ -l /tcp/8080
+
+   mempool:
+      image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
+      command: -a amqp://guest:guest@amqp:5672/
+
+   block_store:
+      image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
+      command: -a amqp://guest:guest@amqp:5672/
+
+   # chain:
+   #    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+   #    volumes:
+   #       - config_volume:/root/.koinos
+   #    depends_on:
+   #       - node_config
+   #    command: -a amqp://guest:guest@amqp:5672/
