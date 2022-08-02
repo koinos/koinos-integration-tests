@@ -2,6 +2,7 @@ package publishTransaction
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -12,7 +13,7 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
-	jsonrpc "github.com/ybbus/jsonrpc/v2"
+	jsonrpc "github.com/ybbus/jsonrpc/v3"
 )
 
 func TestPublishTransaction(t *testing.T) {
@@ -21,7 +22,7 @@ func TestPublishTransaction(t *testing.T) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := rpcClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -47,7 +48,7 @@ func TestPublishTransaction(t *testing.T) {
 	}()
 
 	for {
-		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := rpcClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -95,7 +96,7 @@ func TestPublishTransaction(t *testing.T) {
 	currentHeight := headInfoResponse.HeadTopology.Height
 
 	for currentHeight <= startingBlock {
-		response, err := rpcClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := rpcClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -126,7 +127,7 @@ func TestPublishTransaction(t *testing.T) {
 		t.Error(err)
 	}
 
-	response, err := rpcClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
+	response, err := rpcClient.Call(context.Background(), "block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
 		t.Error(err)
 	}
