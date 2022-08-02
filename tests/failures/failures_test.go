@@ -2,13 +2,13 @@ package failures
 
 import (
 	"koinos-integration-tests/integration"
-	// "strconv"
+	"strconv"
 	"testing"
 
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
-	// "github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFailures(t *testing.T) {
@@ -26,30 +26,12 @@ func TestFailures(t *testing.T) {
 
 	integration.CreateBlock(client, []*protocol.Transaction{})
 
-	_, err = testEntryPoint(t, client, failuresKey, 5)
-
-	// failureEntries := []uint32{4, 5}
-	// for i := uint32(1); i < 9; i++ {
-	// 	receipt, err := testEntryPoint(t, client, failuresKey, i)
-
-	// 	t.Logf("Entry: " + strconv.FormatUint(uint64(i), 10))
-	// 	if entryShouldFail(failureEntries, i) {
-	// 		require.Error(t, err)
-	// 		t.Logf("Error: " + err.Error())
-	// 	} else {
-	// 		integration.NoError(t, err)
-	// 		integration.LogTransactionReceipt(t, receipt)
-	// 	}
-	// }
-}
-
-func entryShouldFail(s []uint32, entry uint32) bool {
-	for _, v := range s {
-		if v == entry {
-			return true
-		}
+	for i := uint32(1); i < 6; i++ {
+		_, err := testEntryPoint(t, client, failuresKey, i)
+		t.Logf("Entry: " + strconv.FormatUint(uint64(i), 10))
+		require.Error(t, err)
+		t.Logf("Error: " + err.Error())
 	}
-	return false
 }
 
 func testEntryPoint(t *testing.T, client integration.Client, key *util.KoinosKey, entryPoint uint32) (*protocol.TransactionReceipt, error) {
