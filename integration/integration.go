@@ -1,12 +1,14 @@
 package integration
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -63,11 +65,13 @@ const (
 	GetChainIDCall        = "chain.get_chain_id"
 	GetContractMetaCall   = "contract_meta_store.get_contract_meta"
 	GetHeadInfoCall       = "chain.get_head_info"
+
+	defaultTimeout = time.Second
 )
 
 // Client is an interface for different types of message clients
 type Client interface {
-	Call(method string, params proto.Message, returnType proto.Message) error
+	Call(ctx context.Context, method string, params proto.Message, returnType proto.Message) error
 }
 
 // GetHeadInfo gets the head info of the chain
@@ -75,7 +79,11 @@ func GetHeadInfo(client Client) (*chain.GetHeadInfoResponse, error) {
 	params := chain.GetHeadInfoRequest{}
 
 	headInfo := &chain.GetHeadInfoResponse{}
-	err := client.Call(GetHeadInfoCall, &params, headInfo)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, GetHeadInfoCall, &params, headInfo)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +100,11 @@ func GetAccountNonce(client Client, address []byte) (uint64, error) {
 
 	// Make the rpc call
 	var cResp chain.GetAccountNonceResponse
-	err := client.Call(GetAccountNonceCall, &params, &cResp)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, GetAccountNonceCall, &params, &cResp)
 	if err != nil {
 		return 0, err
 	}
@@ -112,7 +124,11 @@ func ReadContract(client Client, args []byte, contractID []byte, entryPoint uint
 
 	// Make the rpc call
 	var cResp chain.ReadContractResponse
-	err := client.Call(ReadContractCall, &params, &cResp)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, ReadContractCall, &params, &cResp)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +170,11 @@ func GetAccountRc(client Client, address []byte) (uint64, error) {
 
 	// Make the rpc call
 	var cResp chain.GetAccountRcResponse
-	err := client.Call(GetAccountRcCall, &params, &cResp)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, GetAccountRcCall, &params, &cResp)
 	if err != nil {
 		return 0, err
 	}
@@ -169,7 +189,11 @@ func GetChainID(client Client) ([]byte, error) {
 
 	// Make the rpc call
 	var cResp chain.GetChainIdResponse
-	err := client.Call(GetChainIDCall, &params, &cResp)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, GetChainIDCall, &params, &cResp)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +287,7 @@ func translateResponse(service string, resBytes []byte, response proto.Message) 
 	return nil
 }
 
-func (mq *MQClient) Call(method string, params proto.Message, returnType proto.Message) error {
+func (mq *MQClient) Call(ctx context.Context, method string, params proto.Message, returnType proto.Message) error {
 	s := strings.Split(method, ".")
 	if len(s) != 2 {
 		return errors.New("unexpected method length")
@@ -274,7 +298,7 @@ func (mq *MQClient) Call(method string, params proto.Message, returnType proto.M
 		return err
 	}
 
-	resBytes, err := mq.client.RPC("application/octet-stream", s[0], reqBytes)
+	resBytes, err := mq.client.RPCContext(ctx, "application/octet-stream", s[0], reqBytes)
 	if err != nil {
 		return err
 	}
@@ -423,7 +447,11 @@ func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...in
 	block.Signature = signatureBytes
 
 	var submitBlockResp chain.SubmitBlockResponse
-	err = client.Call("chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err = client.Call(ctx, "chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
 	if err != nil {
 		return nil, err
 	}
@@ -559,7 +587,10 @@ func SubmitTransaction(client Client, transaction *protocol.Transaction) (*proto
 
 	response := chain.SubmitTransactionResponse{}
 
-	err := client.Call(SubmitTransactionCall, request, &response)
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, SubmitTransactionCall, request, &response)
 	if err != nil {
 		return nil, err
 	}
@@ -794,6 +825,9 @@ func EventsFromBlockReceipt(blockReceipt *protocol.BlockReceipt) []*protocol.Eve
 func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 	blockID := base58.Encode(blockReceipt.Id)
 	t.Logf("Block: " + blockID)
+	t.Logf("Compute: " + strconv.FormatUint(blockReceipt.ComputeBandwidthUsed, 10))
+	t.Logf("Disk: " + strconv.FormatUint(blockReceipt.DiskStorageUsed, 10))
+	t.Logf("Network: " + strconv.FormatUint(blockReceipt.NetworkBandwidthUsed, 10))
 
 	if len(blockReceipt.Logs) > 0 {
 		t.Logf(" * Logs")
@@ -818,6 +852,10 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 			t.Logf(" > Transaction: " + transactionID)
 		}
 
+		t.Logf("  * Compute: " + strconv.FormatUint(txReceipt.ComputeBandwidthUsed, 10))
+		t.Logf("  * Disk: " + strconv.FormatUint(txReceipt.DiskStorageUsed, 10))
+		t.Logf("  * Network: " + strconv.FormatUint(txReceipt.NetworkBandwidthUsed, 10))
+
 		if len(txReceipt.Logs) > 0 {
 			t.Logf("  * Logs")
 			for _, log := range txReceipt.Logs {
@@ -831,6 +869,35 @@ func LogBlockReceipt(t *testing.T, blockReceipt *protocol.BlockReceipt) {
 				bytes := base64.StdEncoding.EncodeToString(event.Data)
 				t.Logf("   - " + event.Name + ": " + bytes)
 			}
+		}
+	}
+}
+
+// LogTransactionReceipt logs log messages contained within a transaction receipt
+func LogTransactionReceipt(t *testing.T, txReceipt *protocol.TransactionReceipt) {
+	transactionID := base58.Encode(txReceipt.Id)
+	if txReceipt.Reverted {
+		t.Logf("Transaction: " + transactionID + " (reverted)")
+	} else {
+		t.Logf("Transaction: " + transactionID)
+	}
+
+	t.Logf("Compute: " + strconv.FormatUint(txReceipt.ComputeBandwidthUsed, 10))
+	t.Logf("Disk: " + strconv.FormatUint(txReceipt.DiskStorageUsed, 10))
+	t.Logf("Network: " + strconv.FormatUint(txReceipt.NetworkBandwidthUsed, 10))
+
+	if len(txReceipt.Logs) > 0 {
+		t.Logf(" * Logs")
+		for _, log := range txReceipt.Logs {
+			t.Logf("   - " + log)
+		}
+	}
+
+	if len(txReceipt.Events) > 0 {
+		t.Logf(" * Events")
+		for _, event := range txReceipt.Events {
+			bytes := base64.StdEncoding.EncodeToString(event.Data)
+			t.Logf("   - " + event.Name + ": " + bytes)
 		}
 	}
 }

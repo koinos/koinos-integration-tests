@@ -2,6 +2,7 @@ package bucketBrigade
 
 import (
 	"bytes"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"testing"
@@ -10,7 +11,7 @@ import (
 	kjson "github.com/koinos/koinos-proto-golang/encoding/json"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
-	jsonrpc "github.com/ybbus/jsonrpc/v2"
+	jsonrpc "github.com/ybbus/jsonrpc/v3"
 )
 
 func TestBucketBrigade(t *testing.T) {
@@ -20,7 +21,7 @@ func TestBucketBrigade(t *testing.T) {
 	headInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := endClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -48,7 +49,7 @@ func TestBucketBrigade(t *testing.T) {
 	}()
 
 	for {
-		response, err := producerClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := producerClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -74,7 +75,7 @@ func TestBucketBrigade(t *testing.T) {
 	endHeadInfoResponse := chain.GetHeadInfoResponse{}
 
 	for {
-		response, err := endClient.Call("chain.get_head_info", json.RawMessage("{}"))
+		response, err := endClient.Call(context.Background(), "chain.get_head_info", json.RawMessage("{}"))
 		if err == nil && response.Error == nil {
 			raw := json.RawMessage{}
 			err := response.GetObject(&raw)
@@ -110,7 +111,7 @@ func TestBucketBrigade(t *testing.T) {
 		t.Error(err)
 	}
 
-	response, err := endClient.Call("block_store.get_blocks_by_height", json.RawMessage(blocksReq))
+	response, err := endClient.Call(context.Background(), "block_store.get_blocks_by_height", json.RawMessage(blocksReq))
 	if err != nil {
 		t.Error(err)
 	}
