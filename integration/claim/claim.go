@@ -16,13 +16,13 @@ const (
 	getInfoEntry uint32 = 0xbd7f6850
 )
 
-// A wrapper around the governance contract
+// Claim is a wrapper around the claim contract
 type Claim struct {
 	key    *util.KoinosKey
 	client integration.Client
 }
 
-// SubmitProposal to the goverance contract
+// SubmitClaim to the claim contract
 func (c *Claim) SubmitClaim(t *testing.T, publicKey []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
 	claimArgs := &claim.ClaimArguments{
 		EthAddress:  publicKey,
@@ -69,6 +69,7 @@ func (c *Claim) SubmitClaim(t *testing.T, publicKey []byte, privateKey []byte, p
 	return integration.CreateBlock(c.client, []*protocol.Transaction{transaction})
 }
 
+// GetInfo from the claim contract
 func (c *Claim) GetInfo() (*claim.ClaimInfo, error) {
 	getInfoArgs := &claim.GetInfoArguments{}
 
@@ -91,6 +92,7 @@ func (c *Claim) GetInfo() (*claim.ClaimInfo, error) {
 	return info.GetValue(), nil
 }
 
+// NewClaim creates a new Claim wrapper
 func NewClaim(client integration.Client) *Claim {
 	claimKey, _ := integration.GetKey(integration.Claim)
 	return &Claim{key: claimKey, client: client}
