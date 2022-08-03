@@ -6,7 +6,7 @@ require (
 	github.com/btcsuite/btcd v0.20.1-beta
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/koinos/koinos-mq-golang v0.0.0-20220319044422-57bccec4eb07
-	github.com/koinos/koinos-proto-golang v0.3.1-0.20220713180354-c6f23a99d0d7
+	github.com/koinos/koinos-proto-golang v0.3.1-0.20220802205931-319ee3a6b490
 	github.com/koinos/koinos-util-golang v0.0.0-20220721224250-480db38e2310
 	github.com/multiformats/go-multihash v0.1.0
 	github.com/stretchr/testify v1.7.1
