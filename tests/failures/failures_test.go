@@ -26,7 +26,7 @@ func TestFailures(t *testing.T) {
 
 	integration.CreateBlock(client, []*protocol.Transaction{})
 
-	for i := uint32(1); i < 6; i++ {
+	for i := uint32(1); i < 7; i++ {
 		_, err := testEntryPoint(t, client, failuresKey, i)
 		t.Logf("Entry: " + strconv.FormatUint(uint64(i), 10))
 		require.Error(t, err)
