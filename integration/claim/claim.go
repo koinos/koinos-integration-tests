@@ -1,13 +1,16 @@
 package claim
 
 import (
+	"encoding/hex"
 	"koinos-integration-tests/integration"
 	"testing"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
+	"github.com/mr-tron/base58"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -23,20 +26,41 @@ type Claim struct {
 }
 
 // SubmitClaim to the claim contract
-func (c *Claim) SubmitClaim(t *testing.T, publicKey []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
-	t.Logf("Make Claim")
+func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
+	// pk, err := crypto.ToECDSA(privateKey)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
+	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
+
+	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
+
+	t.Log(hex.EncodeToString(pk.PubKey().SerializeCompressed()))
+	t.Log(hex.EncodeToString(pk.PubKey().SerializeUncompressed()))
+
+	h := crypto.Keccak256Hash([]byte(messageStr))
+
+	sig, err := btcec.SignCompact(btcec.S256(), pk, h.Bytes(), true)
+	if err != nil {
+		return nil, err
+	}
+	// sig, err := crypto.Sign(h.Bytes(), pk)
+	// if err != nil {
+	// 	return nil, err
+	// }
+
 	claimArgs := &claim.ClaimArguments{
-		EthAddress:  publicKey,
-		KoinAddress: payer.PublicBytes(),
+		EthAddress:  ethAddress,
+		KoinAddress: payer.AddressBytes(),
+		Signature:   sig,
 	}
 
-	t.Logf("Marshal Claim")
 	args, err := proto.Marshal(claimArgs)
 	if err != nil {
 		return nil, err
 	}
 
-	t.Logf("Make op")
 	op := &protocol.Operation{
 		Op: &protocol.Operation_CallContract{
 			CallContract: &protocol.CallContractOperation{
@@ -47,35 +71,11 @@ func (c *Claim) SubmitClaim(t *testing.T, publicKey []byte, privateKey []byte, p
 		},
 	}
 
-	t.Logf("Make transaction")
 	transaction, err := integration.CreateTransaction(c.client, []*protocol.Operation{op}, payer)
 	if err != nil {
 		return nil, err
 	}
 
-	t.Logf("Marshal header")
-	headerBytes, err := proto.Marshal(transaction.GetHeader())
-	if err != nil {
-		return nil, err
-	}
-
-	t.Logf("Make priv key object")
-	pk, err := crypto.ToECDSA(privateKey)
-	if err != nil {
-		return nil, err
-	}
-
-	t.Logf("Sign")
-	h := crypto.Keccak256Hash(headerBytes)
-	sig, err := crypto.Sign(h.Bytes(), pk)
-	if err != nil {
-		return nil, err
-	}
-
-	t.Logf("Append")
-	transaction.Signatures = append(transaction.Signatures, sig)
-
-	t.Logf("Submit block")
 	return integration.CreateBlock(c.client, []*protocol.Transaction{transaction})
 }
 

@@ -3,6 +3,7 @@ package claim
 import (
 	"encoding/hex"
 	claimUtil "koinos-integration-tests/integration/claim"
+	"koinos-integration-tests/integration/token"
 
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
@@ -14,7 +15,7 @@ import (
 )
 
 const (
-	claimAPubKey  = "AAAA1a60fec04ff912D673ab974A5b847A950f8F"
+	claimAAddress = "AAAA1a60fec04ff912D673ab974A5b847A950f8F"
 	claimAPrivKey = "d2c45a63fb20d400c1ed986f0946cc8367c38da278ee090fd430df26627e9a29"
 )
 
@@ -45,27 +46,28 @@ func TestClaim(t *testing.T) {
 	t.Logf("Checking initial info")
 	testInfo(t, cl, 0, 0, 4, 4682918988467)
 
-	// aliceKey, err := util.GenerateKoinosKey()
-	// integration.NoError(t, err)
+	aliceKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
 
-	// koin := token.GetKoinToken(client)
+	koin := token.GetKoinToken(client)
 
-	// totalSupply, err := koin.TotalSupply()
-	// integration.NoError(t, err)
+	totalSupply, err := koin.TotalSupply()
+	integration.NoError(t, err)
 
-	// t.Logf("KOIN supply: %d", totalSupply)
+	t.Logf("KOIN supply: %d", totalSupply)
 
-	// t.Logf("Minting to Alice")
-	// koin.Mint(aliceKey.AddressBytes(), 200000000)
+	t.Logf("Minting to Alice")
+	koin.Mint(aliceKey.AddressBytes(), 200000000)
 
-	// totalSupply, err = koin.TotalSupply()
-	// integration.NoError(t, err)
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
 
-	// t.Logf("Submitting claim")
+	t.Logf("Submitting claim")
 
-	// receipt, err := submitClaim(t, cl, claimAPubKey, claimAPrivKey, aliceKey)
-	// integration.NoError(t, err)
-	// integration.LogBlockReceipt(t, receipt)
+	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey)
+	integration.NoError(t, err)
+	integration.LogBlockReceipt(t, receipt)
+	require.EqualValuesf(t, 1, 2, "derp")
 }
 
 func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinosKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
