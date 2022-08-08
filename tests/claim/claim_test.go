@@ -3,7 +3,6 @@ package claim
 import (
 	"encoding/hex"
 	claimUtil "koinos-integration-tests/integration/claim"
-	"koinos-integration-tests/integration/token"
 
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
@@ -38,10 +37,7 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim contract")
-	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey, func(op *protocol.UploadContractOperation) error {
-		op.AuthorizesTransactionApplication = true
-		return nil
-	})
+	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey)
 	integration.NoError(t, err)
 
 	cl := claimUtil.NewClaim(client)
@@ -49,27 +45,27 @@ func TestClaim(t *testing.T) {
 	t.Logf("Checking initial info")
 	testInfo(t, cl, 0, 0, 4, 4682918988467)
 
-	aliceKey, err := util.GenerateKoinosKey()
-	integration.NoError(t, err)
+	// aliceKey, err := util.GenerateKoinosKey()
+	// integration.NoError(t, err)
 
-	koin := token.GetKoinToken(client)
+	// koin := token.GetKoinToken(client)
 
-	totalSupply, err := koin.TotalSupply()
-	integration.NoError(t, err)
+	// totalSupply, err := koin.TotalSupply()
+	// integration.NoError(t, err)
 
-	t.Logf("KOIN supply: %d", totalSupply)
+	// t.Logf("KOIN supply: %d", totalSupply)
 
-	t.Logf("Minting to Alice")
-	koin.Mint(aliceKey.AddressBytes(), 200000000)
+	// t.Logf("Minting to Alice")
+	// koin.Mint(aliceKey.AddressBytes(), 200000000)
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
+	// totalSupply, err = koin.TotalSupply()
+	// integration.NoError(t, err)
 
-	t.Logf("Submitting claim")
+	// t.Logf("Submitting claim")
 
-	receipt, err := submitClaim(t, cl, claimAPubKey, claimAPrivKey, aliceKey)
-	integration.NoError(t, err)
-	integration.LogBlockReceipt(t, receipt)
+	// receipt, err := submitClaim(t, cl, claimAPubKey, claimAPrivKey, aliceKey)
+	// integration.NoError(t, err)
+	// integration.LogBlockReceipt(t, receipt)
 }
 
 func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinosKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
