@@ -36,9 +36,6 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 
 	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
 
-	t.Log(hex.EncodeToString(pk.PubKey().SerializeCompressed()))
-	t.Log(hex.EncodeToString(pk.PubKey().SerializeUncompressed()))
-
 	h := crypto.Keccak256Hash([]byte(messageStr))
 
 	sig, err := btcec.SignCompact(btcec.S256(), pk, h.Bytes(), true)
