@@ -67,7 +67,11 @@ func TestClaim(t *testing.T) {
 	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey)
 	integration.NoError(t, err)
 	integration.LogBlockReceipt(t, receipt)
-	require.EqualValuesf(t, 1, 2, "derp")
+
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 9900000000+200000000, totalSupply, "total supply mismatch")
 }
 
 func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinosKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
