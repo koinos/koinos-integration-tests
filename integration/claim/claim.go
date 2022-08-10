@@ -15,8 +15,9 @@ import (
 )
 
 const (
-	claimEntry   uint32 = 0xdd1b3c31
-	getInfoEntry uint32 = 0xbd7f6850
+	claimEntry      uint32 = 0xdd1b3c31
+	getInfoEntry    uint32 = 0xbd7f6850
+	checkClaimEntry uint32 = 0x2ac66b4c
 )
 
 // Claim is a wrapper around the claim contract
@@ -88,6 +89,33 @@ func (c *Claim) GetInfo() (*claim.ClaimInfo, error) {
 	}
 
 	return info.GetValue(), nil
+}
+
+// CheckClaim checks the status of a claim
+func (c *Claim) CheckClaim(ethAddress []byte) (*claim.ClaimStatus, error) {
+	checkClaimArgs := &claim.CheckClaimArguments{EthAddress: ethAddress}
+
+	args, err := proto.Marshal(checkClaimArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := integration.ReadContract(c.client, args, c.key.AddressBytes(), checkClaimEntry)
+	if err != nil {
+		return nil, err
+	}
+
+	check := &claim.CheckClaimResult{}
+	err = proto.Unmarshal(resp.GetResult(), check)
+	if err != nil {
+		return nil, err
+	}
+
+	if check.GetValue() == nil {
+		return &claim.ClaimStatus{}, nil
+	}
+
+	return check.GetValue(), nil
 }
 
 // NewClaim creates a new Claim wrapper
