@@ -44,6 +44,7 @@ const (
 	Pow
 	Resources
 	Vhp
+	Claim
 )
 
 var wifMap = map[int]string{
@@ -55,6 +56,7 @@ var wifMap = map[int]string{
 	Pow:         "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
 	Resources:   "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
 	Vhp:         "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
+	Claim:       "5HwGceo2dySLQencsReyEHfbRRyJWTowhUVw1jVj3QGdm4Aai4N",
 }
 
 const (
