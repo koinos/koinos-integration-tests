@@ -27,11 +27,6 @@ type Claim struct {
 
 // SubmitClaim to the claim contract
 func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
-	// pk, err := crypto.ToECDSA(privateKey)
-	// if err != nil {
-	// 	return nil, err
-	// }
-
 	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
 
 	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
@@ -42,10 +37,6 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 	if err != nil {
 		return nil, err
 	}
-	// sig, err := crypto.Sign(h.Bytes(), pk)
-	// if err != nil {
-	// 	return nil, err
-	// }
 
 	claimArgs := &claim.ClaimArguments{
 		EthAddress:  ethAddress,

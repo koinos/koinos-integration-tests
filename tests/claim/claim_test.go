@@ -5,6 +5,7 @@ import (
 	claimUtil "koinos-integration-tests/integration/claim"
 	"koinos-integration-tests/integration/token"
 
+	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
@@ -17,13 +18,21 @@ import (
 const (
 	claimAAddress = "AAAA1a60fec04ff912D673ab974A5b847A950f8F"
 	claimAPrivKey = "d2c45a63fb20d400c1ed986f0946cc8367c38da278ee090fd430df26627e9a29"
+	claimAValue   = 9900000000
+	claimBAddress = "BBBB49877B724A6cDd5DdF22A11c739Fe0BD8625"
+	claimBPrivKey = "1c3855b94a9ec214ba5eeedc1d7bea8c2b710562069cd6078774b57442fe90ce"
+	claimBValue   = 50000000000
+	claimCAddress = "CCCC60CE8B8FDfdC97d13619790986e64D02Ba3F"
+	claimCPrivKey = "8e96108ba841651d30f5539485aee74e692437ff8b2ba80600102c43ad62ae22"
+	claimCValue   = 4598962988467
+	claimDAddress = "DDDDAA294C11235eB8B129B9b474B89e38eB685E"
+	claimDPrivKey = "18f2a960234f5ea1ea09d6d05d77fd7fd45e7d6ede4d941d652002e0fa5a8141"
+	claimDValue   = 24056000000
+	bogusAddress  = "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
 )
 
 func TestClaim(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
-
-	//genesisKey, err := integration.GetKey(integration.Genesis)
-	//integration.NoError(t, err)
 
 	claimKey, err := integration.GetKey(integration.Claim)
 	integration.NoError(t, err)
@@ -44,10 +53,21 @@ func TestClaim(t *testing.T) {
 	cl := claimUtil.NewClaim(client)
 
 	t.Logf("Checking initial info")
-	testInfo(t, cl, 0, 0, 4, 4682918988467)
+	info := &claim.ClaimInfo{
+		TotalEthAccounts:   4,
+		TotalKoin:          4682918988467,
+		KoinClaimed:        0,
+		EthAccountsClaimed: 0,
+	}
+	testInfo(t, cl, info)
 
 	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
+	aliceAddress := aliceKey.AddressBytes()
+
+	bobKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+	bobAddress := bobKey.AddressBytes()
 
 	koin := token.GetKoinToken(client)
 
@@ -58,6 +78,7 @@ func TestClaim(t *testing.T) {
 
 	t.Logf("Minting to Alice")
 	koin.Mint(aliceKey.AddressBytes(), 200000000)
+	expectedSupply := 200000000
 
 	totalSupply, err = koin.TotalSupply()
 	integration.NoError(t, err)
@@ -67,11 +88,112 @@ func TestClaim(t *testing.T) {
 	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey)
 	integration.NoError(t, err)
 	integration.LogBlockReceipt(t, receipt)
+	expectedSupply += claimAValue
+	info.KoinClaimed += claimAValue
+	info.EthAccountsClaimed++
 
 	totalSupply, err = koin.TotalSupply()
 	integration.NoError(t, err)
 
-	require.EqualValues(t, 9900000000+200000000, totalSupply, "total supply mismatch")
+	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+
+	aliceBalance, err := koin.Balance(aliceAddress)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, expectedSupply, aliceBalance, "alice balance mismatch")
+
+	testInfo(t, cl, info)
+
+	t.Logf("Submitting duplicate claim")
+	receipt, err = submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey)
+	integration.NoError(t, err)
+	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
+	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
+
+	testInfo(t, cl, info)
+
+	t.Logf("Submitting a claim with the wrong signature")
+	receipt, err = submitClaim(t, cl, claimBAddress, claimAPrivKey, aliceKey)
+	integration.NoError(t, err)
+	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
+	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
+
+	testInfo(t, cl, info)
+
+	t.Logf("Submitting a claim on a non-existent address")
+	_, err = submitClaim(t, cl, bogusAddress, claimAPrivKey, aliceKey)
+	integration.NoError(t, err)
+	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
+	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
+
+	testInfo(t, cl, info)
+
+	t.Logf("Submit remainder of claims")
+	expectedAliceBalance := expectedSupply
+	expectedBobBalance := 0
+
+	_, err = submitClaim(t, cl, claimBAddress, claimBPrivKey, bobKey)
+	integration.NoError(t, err)
+	expectedSupply += claimBValue
+	expectedBobBalance += claimBValue
+	info.KoinClaimed += claimBValue
+	info.EthAccountsClaimed++
+
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+
+	aliceBalance, err = koin.Balance(aliceAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedAliceBalance, aliceBalance, "alice balance mismatch")
+
+	bobBalance, err := koin.Balance(bobAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedBobBalance, bobBalance, "bob balance mismatch")
+
+	testInfo(t, cl, info)
+
+	_, err = submitClaim(t, cl, claimCAddress, claimCPrivKey, bobKey)
+	integration.NoError(t, err)
+	expectedSupply += claimCValue
+	expectedBobBalance += claimCValue
+	info.KoinClaimed += claimCValue
+	info.EthAccountsClaimed++
+
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+
+	aliceBalance, err = koin.Balance(aliceAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedAliceBalance, aliceBalance, "alice balance mismatch")
+
+	bobBalance, err = koin.Balance(bobAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedBobBalance, bobBalance, "bob balance mismatch")
+
+	testInfo(t, cl, info)
+
+	_, err = submitClaim(t, cl, claimDAddress, claimDPrivKey, bobKey)
+	integration.NoError(t, err)
+	expectedSupply += claimDValue
+	expectedBobBalance += claimDValue
+	info.KoinClaimed += claimDValue
+	info.EthAccountsClaimed++
+
+	totalSupply, err = koin.TotalSupply()
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+
+	aliceBalance, err = koin.Balance(aliceAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedAliceBalance, aliceBalance, "alice balance mismatch")
+
+	bobBalance, err = koin.Balance(bobAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedBobBalance, bobBalance, "bob balance mismatch")
+
+	testInfo(t, cl, info)
 }
 
 func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinosKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
@@ -84,12 +206,12 @@ func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey strin
 	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, koinosKey)
 }
 
-func testInfo(t *testing.T, cl *claimUtil.Claim, eth_claimed uint32, koin_claimed uint64, total_eth uint32, total_koin uint64) {
+func testInfo(t *testing.T, cl *claimUtil.Claim, expectedInfo *claim.ClaimInfo) {
 	info, err := cl.GetInfo()
 	integration.NoError(t, err)
 
-	require.EqualValues(t, 4, info.TotalEthAccounts)
-	require.EqualValues(t, 4682918988467, info.TotalKoin)
-	require.EqualValues(t, 0, info.KoinClaimed)
-	require.EqualValues(t, 0, info.EthAccountsClaimed)
+	require.EqualValues(t, expectedInfo.TotalEthAccounts, info.TotalEthAccounts)
+	require.EqualValues(t, expectedInfo.TotalKoin, info.TotalKoin)
+	require.EqualValues(t, expectedInfo.KoinClaimed, info.KoinClaimed)
+	require.EqualValues(t, expectedInfo.EthAccountsClaimed, info.EthAccountsClaimed)
 }
