@@ -1,6 +1,7 @@
 package pob
 
 import (
+	"context"
 	"koinos-integration-tests/integration"
 	"koinos-integration-tests/integration/token"
 	"testing"
@@ -19,6 +20,8 @@ const (
 	registerPublicKeyEntry            = 0x53192be1
 	processBlockSignatureEntry        = 0xe0adbeab
 )
+
+type void struct{}
 
 func TestPob(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
@@ -131,6 +134,8 @@ func TestPob(t *testing.T) {
 
 	// TODO: Check event
 
+	integration.CreateBlocks(client, 20, genesisKey)
+
 	t.Logf("Enabling PoB")
 
 	enablePoB := &protocol.Operation{
@@ -161,9 +166,14 @@ func TestPob(t *testing.T) {
 	endBlock := headInfo.HeadTopology.Height + 10
 
 	test_timer := time.NewTimer(30 * time.Second)
+	cancelChan := make(chan void)
 	go func() {
-		<-test_timer.C
-		panic("Timer expired")
+		select {
+		case <-cancelChan:
+			return
+		case <-test_timer.C:
+			panic("Timer expired")
+		}
 	}()
 
 	for {
@@ -173,9 +183,43 @@ func TestPob(t *testing.T) {
 		t.Logf("Block Height %d", headInfo.HeadTopology.Height)
 
 		if headInfo.HeadTopology.Height > endBlock {
+			cancelChan <- void{}
 			break
 		}
 
 		time.Sleep(time.Second)
 	}
+
+	// Set the public key again. Should trigger key delay
+	//tx, err = integration.CreateTransaction(client, []*protocol.Operation{registerKey}, producerKey)
+	//integration.NoError(t, err)
+
+	txReceipt, err := client.SubmitTransaction(context.Background(), []*protocol.Operation{registerKey}, producerKey, &kjsonrpc.SubmissionParams{Nonce: 3, RCLimit: 0}, true)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, len(txReceipt.Events), 1, "Expected 1 events in transaction receipt")
+
+	headInfo, err = integration.GetHeadInfo(client)
+	integration.NoError(t, err)
+
+	headBlock := headInfo.HeadTopology.Height
+
+	for {
+		time.Sleep(time.Second)
+
+		headInfo, err = integration.GetHeadInfo(client)
+		integration.NoError(t, err)
+
+		if headInfo.HeadTopology.Height == headBlock {
+			break
+		}
+
+		headBlock = headInfo.HeadTopology.Height
+	}
+
+	<-(time.NewTimer(5 * time.Second).C)
+	headInfo, err = integration.GetHeadInfo(client)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, headBlock, headInfo.HeadTopology.Height, "Blocks erroneously produced")
 }
