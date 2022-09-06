@@ -205,7 +205,7 @@ func TestPob(t *testing.T) {
 	headBlock := headInfo.HeadTopology.Height
 
 	for {
-		time.Sleep(time.Second)
+		time.Sleep(2 * time.Second)
 
 		headInfo, err = integration.GetHeadInfo(client)
 		integration.NoError(t, err)
