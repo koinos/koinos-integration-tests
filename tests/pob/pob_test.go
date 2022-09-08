@@ -1,6 +1,8 @@
 package pob
 
 import (
+	"bytes"
+	"context"
 	"koinos-integration-tests/integration"
 	"koinos-integration-tests/integration/token"
 	"testing"
@@ -9,6 +11,7 @@ import (
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/pob"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -131,6 +134,8 @@ func TestPob(t *testing.T) {
 
 	// TODO: Check event
 
+	integration.CreateBlocks(client, 20, genesisKey)
+
 	t.Logf("Enabling PoB")
 
 	enablePoB := &protocol.Operation{
@@ -161,9 +166,14 @@ func TestPob(t *testing.T) {
 	endBlock := headInfo.HeadTopology.Height + 10
 
 	test_timer := time.NewTimer(30 * time.Second)
+	cancelChan := make(chan struct{})
 	go func() {
-		<-test_timer.C
-		panic("Timer expired")
+		select {
+		case <-cancelChan:
+			return
+		case <-test_timer.C:
+			panic("Timer expired")
+		}
 	}()
 
 	for {
@@ -173,9 +183,62 @@ func TestPob(t *testing.T) {
 		t.Logf("Block Height %d", headInfo.HeadTopology.Height)
 
 		if headInfo.HeadTopology.Height > endBlock {
+			cancelChan <- struct{}{}
 			break
 		}
 
 		time.Sleep(time.Second)
 	}
+
+	headInfo, err = integration.GetHeadInfo(client)
+	integration.NoError(t, err)
+
+	headBlockNum := headInfo.HeadTopology.Height
+
+	// Set the public key again. Should trigger key delay
+	txReceipt, err := client.SubmitTransaction(context.Background(), []*protocol.Operation{registerKey}, producerKey, &kjsonrpc.SubmissionParams{Nonce: 3, RCLimit: 0}, true)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, len(txReceipt.Events), 1, "Expected 1 events in transaction receipt")
+
+	trxIncluded := false
+
+	// Check every block until the transaction is included
+	for !trxIncluded {
+		headInfo, err = integration.GetHeadInfo(client)
+		integration.NoError(t, err)
+
+		if headInfo.HeadTopology.Height > headBlockNum {
+			req := &block_store.GetBlocksByHeightRequest{
+				HeadBlockId:         headInfo.HeadTopology.Id,
+				AncestorStartHeight: headBlockNum + 1,
+				NumBlocks:           uint32(headInfo.HeadTopology.Height) - uint32(headBlockNum),
+				ReturnReceipt:       true,
+			}
+			resp := &block_store.GetBlocksByHeightResponse{}
+
+			err := client.Call(context.Background(), "block_store.get_blocks_by_height", req, resp)
+			integration.NoError(t, err)
+
+			headBlockNum = headInfo.HeadTopology.Height
+
+			for _, blockItem := range resp.BlockItems {
+				for _, receipt := range blockItem.Receipt.TransactionReceipts {
+					if bytes.Equal(receipt.Id, txReceipt.Id) {
+						t.Logf("Transaction included in block %d", headBlockNum)
+						trxIncluded = true
+						break
+					}
+				}
+			}
+
+			time.Sleep(time.Second)
+		}
+	}
+
+	<-(time.NewTimer(5 * time.Second).C)
+	headInfo, err = integration.GetHeadInfo(client)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, headBlockNum, headInfo.HeadTopology.Height, "Blocks erroneously produced")
 }
