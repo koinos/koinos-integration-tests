@@ -73,7 +73,7 @@ services:
       - producer
     depends_on:
       - amqp_producer
-    command: -a amqp://guest:guest@amqp_producer:5672/ -s producer -l /ip4/0.0.0.0/tcp/8888
+    command: -a amqp://guest:guest@amqp_producer:5672/ --disable-gossip -s producer -l /ip4/0.0.0.0/tcp/8888
 
   block_producer:
     image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
@@ -130,20 +130,16 @@ services:
     networks:
       - p2p
       - bucket1
-    ports:
-      - "8888:8888"
     depends_on:
       - amqp_bucket1
       - p2p_producer
-    command: -a amqp://guest:guest@amqp_bucket1:5672/ -s bucket1 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_producer/tcp/8888/p2p/QmRT2UJ9uPqmcjCWoxgFZU3AsaMaMqmJ3DaEHeWZFLJp9L
+    command: -a amqp://guest:guest@amqp_bucket1:5672/ --disable-gossip -s bucket1 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_producer/tcp/8888/p2p/QmRT2UJ9uPqmcjCWoxgFZU3AsaMaMqmJ3DaEHeWZFLJp9L
 
   #bucket2
   amqp_bucket2:
     image: rabbitmq:alpine
     networks:
       - bucket2
-    ports:
-      - "5672:5672"
 
   bucket2_config:
     build:
@@ -199,4 +195,4 @@ services:
     depends_on:
       - amqp_bucket2
       - p2p_bucket1
-    command: -a amqp://guest:guest@amqp_bucket2:5672/ -s bucket2 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_bucket1/tcp/8888/p2p/QmcWYgujghF1oJhisxSTGYNjzPGVtejEL8XU41AqmEJsRB
+    command: -a amqp://guest:guest@amqp_bucket2:5672/ --disable-gossip -s bucket2 -l /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_bucket1/tcp/8888/p2p/QmcWYgujghF1oJhisxSTGYNjzPGVtejEL8XU41AqmEJsRB
