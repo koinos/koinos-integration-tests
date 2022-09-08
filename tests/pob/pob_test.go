@@ -21,8 +21,6 @@ const (
 	processBlockSignatureEntry        = 0xe0adbeab
 )
 
-type void struct{}
-
 func TestPob(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
@@ -166,7 +164,7 @@ func TestPob(t *testing.T) {
 	endBlock := headInfo.HeadTopology.Height + 10
 
 	test_timer := time.NewTimer(30 * time.Second)
-	cancelChan := make(chan void)
+	cancelChan := make(chan struct{})
 	go func() {
 		select {
 		case <-cancelChan:
@@ -183,7 +181,7 @@ func TestPob(t *testing.T) {
 		t.Logf("Block Height %d", headInfo.HeadTopology.Height)
 
 		if headInfo.HeadTopology.Height > endBlock {
-			cancelChan <- void{}
+			cancelChan <- struct{}{}
 			break
 		}
 
@@ -191,9 +189,6 @@ func TestPob(t *testing.T) {
 	}
 
 	// Set the public key again. Should trigger key delay
-	//tx, err = integration.CreateTransaction(client, []*protocol.Operation{registerKey}, producerKey)
-	//integration.NoError(t, err)
-
 	txReceipt, err := client.SubmitTransaction(context.Background(), []*protocol.Operation{registerKey}, producerKey, &kjsonrpc.SubmissionParams{Nonce: 3, RCLimit: 0}, true)
 	integration.NoError(t, err)
 
