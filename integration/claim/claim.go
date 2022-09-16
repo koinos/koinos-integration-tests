@@ -2,6 +2,7 @@ package claim
 
 import (
 	"encoding/hex"
+	"fmt"
 	"koinos-integration-tests/integration"
 	"testing"
 
@@ -31,8 +32,9 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
 
 	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
+	fullMessageStr := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(messageStr), messageStr)
 
-	h := crypto.Keccak256Hash([]byte(messageStr))
+	h := crypto.Keccak256Hash([]byte(fullMessageStr))
 
 	sig, err := btcec.SignCompact(btcec.S256(), pk, h.Bytes(), true)
 	if err != nil {
