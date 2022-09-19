@@ -84,6 +84,8 @@ func TestGovernance(t *testing.T) {
 	testFailedProposal(t, client, makeGovernanceRemovalProposal, Governance)
 	testSuccessfulProposal(t, client, makeGovernanceRemovalProposal, Governance, testGovernanceRemovalProposal)
 
+	testSuccessfulProposal(t, client, makePostOverrideProposal, Standard, testPostOverrideProposal)
+
 	testProposalFees(t, client)
 }
 
@@ -727,4 +729,65 @@ func makeGovernanceRemovalProposal(t *testing.T, client integration.Client) ([]b
 	}
 
 	return mroot, ops, nil
+}
+
+func makePostOverrideProposal(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error) {
+	syscallOverrideKey, err := util.GenerateKoinosKey()
+	if err != nil {
+		return nil, nil, err
+	}
+
+	err = integration.UploadContract(client, "../../contracts/override_post.wasm", syscallOverrideKey)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	setSysContractOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemContract{
+			SetSystemContract: &protocol.SetSystemContractOperation{
+				ContractId:     syscallOverrideKey.AddressBytes(),
+				SystemContract: true,
+			},
+		},
+	}
+
+	overridePostBlockOperation := &protocol.Operation{
+		Op: &protocol.Operation_SetSystemCall{
+			SetSystemCall: &protocol.SetSystemCallOperation{
+				CallId: uint32(chain.SystemCallId_post_block_callback),
+				Target: &protocol.SystemCallTarget{
+					Target: &protocol.SystemCallTarget_SystemCallBundle{
+						SystemCallBundle: &protocol.ContractCallBundle{
+							ContractId: syscallOverrideKey.AddressBytes(),
+							EntryPoint: uint32(0xed1baf8d),
+						},
+					},
+				},
+			},
+		},
+	}
+
+	ops := []*protocol.Operation{setSysContractOperation, overridePostBlockOperation}
+
+	mroot, err := integration.CalculateOperationMerkleRoot(ops)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return mroot, ops, nil
+}
+
+func testPostOverrideProposal(client integration.Client, t *testing.T) error {
+	genesisKey, err := integration.GetKey(integration.Genesis)
+	integration.NoError(t, err)
+
+	t.Logf("Pushing block to ensure post_block emits an event")
+	receipt, err := integration.CreateBlock(client, []*protocol.Transaction{}, genesisKey)
+	integration.NoError(t, err)
+
+	blockEvents := integration.EventsFromBlockReceipt(receipt)
+	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
+	require.EqualValues(t, "govtest.post_block_callback_event", blockEvents[0].Name, "Expected 'govtest.post_block_callback_event' event in block receipt")
+
+	return nil
 }
