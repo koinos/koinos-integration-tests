@@ -84,10 +84,10 @@ func TestGovernance(t *testing.T) {
 	testFailedProposal(t, client, makePostOverrideProposal, Standard)
 	testSuccessfulProposal(t, client, makePostOverrideProposal, Standard, testPostOverrideProposal)
 
-	testFailedProposal(t, client, makeGovernanceRemovalProposal, Governance)
-	testSuccessfulProposal(t, client, makeGovernanceRemovalProposal, Governance, testGovernanceRemovalProposal)
+	//testFailedProposal(t, client, makeGovernanceRemovalProposal, Governance)
+	//testSuccessfulProposal(t, client, makeGovernanceRemovalProposal, Governance, testGovernanceRemovalProposal)
 
-	testProposalFees(t, client)
+	//testProposalFees(t, client)
 }
 
 func testProposalFees(t *testing.T, client integration.Client) {
