@@ -5,6 +5,7 @@ import (
 	claimUtil "koinos-integration-tests/integration/claim"
 	"koinos-integration-tests/integration/token"
 
+	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
@@ -40,6 +41,9 @@ func TestClaim(t *testing.T) {
 	koinKey, err := integration.GetKey(integration.Koin)
 	integration.NoError(t, err)
 
+	claimDelegationKey, err := integration.GetKey(integration.ClaimDelegation)
+	integration.NoError(t, err)
+
 	integration.AwaitChain(t, client)
 
 	t.Logf("Uploading KOIN contract")
@@ -48,6 +52,19 @@ func TestClaim(t *testing.T) {
 
 	t.Logf("Uploading claim contract")
 	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey)
+	integration.NoError(t, err)
+
+	t.Logf("Uploading claim delegation contract")
+	err = integration.UploadSystemContract(client, "../../contracts/claim_delegation.wasm", claimKey)
+	integration.NoError(t, err)
+
+	koin := token.GetKoinToken(client)
+
+	// Mint 100 koin to the delegation contract address
+
+	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
+
+	integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
 
 	cl := claimUtil.NewClaim(client)
@@ -68,8 +85,6 @@ func TestClaim(t *testing.T) {
 	bobKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
 	bobAddress := bobKey.AddressBytes()
-
-	koin := token.GetKoinToken(client)
 
 	totalSupply, err := koin.TotalSupply()
 	integration.NoError(t, err)
