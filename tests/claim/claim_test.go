@@ -55,7 +55,7 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim delegation contract")
-	err = integration.UploadSystemContract(client, "../../contracts/claim_delegation.wasm", claimKey)
+	err = integration.UploadSystemContract(client, "../../contracts/claim_delegation.wasm", claimDelegationKey)
 	integration.NoError(t, err)
 
 	koin := token.GetKoinToken(client)
