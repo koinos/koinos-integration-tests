@@ -63,6 +63,7 @@ func TestClaim(t *testing.T) {
 	// Mint 100 koin to the delegation contract address
 
 	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
+	expectedSupply := 10000000000
 
 	integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
@@ -93,7 +94,7 @@ func TestClaim(t *testing.T) {
 
 	t.Logf("Minting to Alice")
 	koin.Mint(aliceKey.AddressBytes(), 200000000)
-	expectedSupply := 200000000
+	expectedSupply += 200000000
 
 	totalSupply, err = koin.TotalSupply()
 	integration.NoError(t, err)
