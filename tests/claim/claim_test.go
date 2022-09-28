@@ -267,6 +267,7 @@ func testInfo(t *testing.T, cl *claimUtil.Claim, expectedInfo *claim.ClaimInfo) 
 func checkSupply(t *testing.T, koin *token.Token, expected uint64) {
 	t.Logf("Ensuring total supply is %d", expected)
 	supply, err := koin.TotalSupply()
+	t.Logf("Total supply returned is %d", supply)
 	integration.NoError(t, err)
 	require.EqualValues(t, expected, supply, "total supply mismatch")
 }
