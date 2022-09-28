@@ -55,19 +55,18 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim delegation contract")
-	err = integration.UploadSystemContract(client, "../../contracts/claim_delegation.wasm", claimDelegationKey)
+	err = integration.UploadContract(client, "../../contracts/claim_delegation.wasm", claimDelegationKey)
 	integration.NoError(t, err)
 
 	koin := token.GetKoinToken(client)
 
-	// Mint 100 koin to the delegation contract address
+	integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
+	integration.NoError(t, err)
 
+	// Mint 100 koin to the delegation contract address
 	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
 	expectedSupply := uint64(10000000000)
 	checkSupply(t, koin, expectedSupply)
-
-	integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
-	integration.NoError(t, err)
 
 	cl := claimUtil.NewClaim(client)
 
