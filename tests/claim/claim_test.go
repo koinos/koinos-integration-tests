@@ -63,7 +63,8 @@ func TestClaim(t *testing.T) {
 	// Mint 100 koin to the delegation contract address
 
 	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
-	expectedSupply := 10000000000
+	expectedSupply := uint64(10000000000)
+	checkSupply(t, koin, expectedSupply)
 
 	integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
@@ -96,8 +97,7 @@ func TestClaim(t *testing.T) {
 	koin.Mint(aliceKey.AddressBytes(), 200000000)
 	expectedSupply += 200000000
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
+	checkSupply(t, koin, expectedSupply)
 
 	t.Logf("Submitting claim")
 
@@ -108,9 +108,7 @@ func TestClaim(t *testing.T) {
 	info.KoinClaimed += claimAValue
 	info.EthAccountsClaimed++
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
-	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+	checkSupply(t, koin, expectedSupply)
 
 	aliceBalance, err := koin.Balance(aliceAddress)
 	integration.NoError(t, err)
@@ -173,9 +171,7 @@ func TestClaim(t *testing.T) {
 	info.KoinClaimed += claimBValue
 	info.EthAccountsClaimed++
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
-	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+	checkSupply(t, koin, expectedSupply)
 
 	aliceBalance, err = koin.Balance(aliceAddress)
 	integration.NoError(t, err)
@@ -199,9 +195,7 @@ func TestClaim(t *testing.T) {
 	info.KoinClaimed += claimCValue
 	info.EthAccountsClaimed++
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
-	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+	checkSupply(t, koin, expectedSupply)
 
 	aliceBalance, err = koin.Balance(aliceAddress)
 	integration.NoError(t, err)
@@ -225,9 +219,7 @@ func TestClaim(t *testing.T) {
 	info.KoinClaimed += claimDValue
 	info.EthAccountsClaimed++
 
-	totalSupply, err = koin.TotalSupply()
-	integration.NoError(t, err)
-	require.EqualValues(t, expectedSupply, totalSupply, "total supply mismatch")
+	checkSupply(t, koin, expectedSupply)
 
 	aliceBalance, err = koin.Balance(aliceAddress)
 	integration.NoError(t, err)
@@ -270,4 +262,11 @@ func testInfo(t *testing.T, cl *claimUtil.Claim, expectedInfo *claim.ClaimInfo) 
 	require.EqualValues(t, expectedInfo.TotalKoin, info.TotalKoin)
 	require.EqualValues(t, expectedInfo.KoinClaimed, info.KoinClaimed)
 	require.EqualValues(t, expectedInfo.EthAccountsClaimed, info.EthAccountsClaimed)
+}
+
+func checkSupply(t *testing.T, koin *token.Token, expected uint64) {
+	t.Logf("Ensuring total supply is %d", expected)
+	supply, err := koin.TotalSupply()
+	integration.NoError(t, err)
+	require.EqualValues(t, expected, supply, "total supply mismatch")
 }
