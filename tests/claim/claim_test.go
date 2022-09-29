@@ -60,14 +60,27 @@ func TestClaim(t *testing.T) {
 
 	koin := token.GetKoinToken(client)
 
-	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
+	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
+	aliceAddress := aliceKey.AddressBytes()
 
-	// Mint 100 koin to the delegation contract address
+	bobKey, err := util.GenerateKoinosKey()
+	integration.NoError(t, err)
+	bobAddress := bobKey.AddressBytes()
 
+	t.Logf("Minting to claim delegation contract")
 	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
 	expectedSupply := uint64(10000000000)
 	checkSupply(t, koin, expectedSupply)
+
+	t.Logf("Minting to Alice")
+	koin.Mint(aliceKey.AddressBytes(), 200000000)
+	expectedSupply += 200000000
+
+	checkSupply(t, koin, expectedSupply)
+
+	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
+	integration.NoError(t, err)
 
 	cl := claimUtil.NewClaim(client)
 
@@ -80,24 +93,10 @@ func TestClaim(t *testing.T) {
 	}
 	testInfo(t, cl, info)
 
-	aliceKey, err := util.GenerateKoinosKey()
-	integration.NoError(t, err)
-	aliceAddress := aliceKey.AddressBytes()
-
-	bobKey, err := util.GenerateKoinosKey()
-	integration.NoError(t, err)
-	bobAddress := bobKey.AddressBytes()
-
 	totalSupply, err := koin.TotalSupply()
 	integration.NoError(t, err)
 
 	t.Logf("KOIN supply: %d", totalSupply)
-
-	t.Logf("Minting to Alice")
-	koin.Mint(aliceKey.AddressBytes(), 200000000)
-	expectedSupply += 200000000
-
-	checkSupply(t, koin, expectedSupply)
 
 	t.Logf("Submitting claim")
 
