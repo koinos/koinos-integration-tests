@@ -5,6 +5,7 @@ import (
 	claimUtil "koinos-integration-tests/integration/claim"
 	"koinos-integration-tests/integration/token"
 
+	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
@@ -59,8 +60,8 @@ func TestClaim(t *testing.T) {
 
 	koin := token.GetKoinToken(client)
 
-	//integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
-	//integration.NoError(t, err)
+	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
+	integration.NoError(t, err)
 
 	// Mint 100 koin to the delegation contract address
 
