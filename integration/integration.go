@@ -582,6 +582,106 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 	return transaction, nil
 }
 
+// CreateTransaction creates a transaction from a list of operations
+// Variadic arguments can be the following:
+//    mod func(b *protocol.Block) error - Modification callback function, called on each block
+//    *util.KoinosKey - Key to sign the transaction with, the first key is used to retreive the nonce
+func CreateTransactionWithPayer(client Client, ops []*protocol.Operation, payer []byte, vars ...interface{}) (*protocol.Transaction, error) {
+	var mod func(b *protocol.Transaction) error = nil
+	keys := make([]*util.KoinosKey, 0)
+
+	if len(vars) > 0 {
+		for _, v := range vars {
+			switch t := v.(type) {
+			case *util.KoinosKey:
+				keys = append(keys, t)
+			case func(b *protocol.Transaction) error:
+				mod = t
+			default:
+				return nil, fmt.Errorf("unexpected argument")
+			}
+		}
+	}
+
+	if len(keys) == 0 {
+		return nil, fmt.Errorf("expected at least one key")
+	}
+
+	// Cache the public address
+	address := keys[0].AddressBytes()
+
+	// Fetch the account's nonce
+	nonce, err := GetAccountNonce(client, address)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert none+1 to bytes
+	nonceBytes, err := util.UInt64ToNonceBytes(nonce + 1)
+	if err != nil {
+		return nil, err
+	}
+
+	rcLimit, err := GetAccountRc(client, address)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get operation multihashes
+	opHashes := make([][]byte, len(ops))
+	for i, op := range ops {
+		opHashes[i], err = util.HashMessage(op)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// Find merkle root
+	merkleRoot, err := util.CalculateMerkleRoot(opHashes)
+	if err != nil {
+		return nil, err
+	}
+
+	chainID, err := GetChainID(client)
+	if err != nil {
+		return nil, err
+	}
+
+	// Create the transaction
+	header := protocol.TransactionHeader{ChainId: chainID, RcLimit: rcLimit, Nonce: nonceBytes, OperationMerkleRoot: merkleRoot, Payer: payer}
+	transaction := &protocol.Transaction{Header: &header, Operations: ops}
+
+	if mod != nil {
+		if err = mod(transaction); err != nil {
+			return nil, err
+		}
+	}
+
+	// Calculate the transaction ID
+	headerBytes, err := canonical.Marshal(&header)
+	if err != nil {
+		return nil, err
+	}
+
+	sha256Hasher := sha256.New()
+	sha256Hasher.Write(headerBytes)
+	tid, err := multihash.Encode(sha256Hasher.Sum(nil), multihash.SHA2_256)
+	if err != nil {
+		return nil, err
+	}
+
+	transaction.Id = tid
+
+	// Sign the transaction
+	for _, key := range keys {
+		if err := util.SignTransaction(key.PrivateBytes(), transaction); err != nil {
+			return nil, err
+		}
+	}
+
+	return transaction, nil
+}
+
 func SubmitTransaction(client Client, transaction *protocol.Transaction) (*protocol.TransactionReceipt, error) {
 
 	request := &chain.SubmitTransactionRequest{

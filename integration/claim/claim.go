@@ -28,10 +28,10 @@ type Claim struct {
 }
 
 // SubmitClaim to the claim contract
-func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
+func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, koinAddress *util.KoinosKey, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
 	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
 
-	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
+	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(koinAddress.AddressBytes())
 	fullMessageStr := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(messageStr), messageStr)
 
 	h := crypto.Keccak256Hash([]byte(fullMessageStr))
@@ -43,7 +43,7 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 
 	claimArgs := &claim.ClaimArguments{
 		EthAddress:  ethAddress,
-		KoinAddress: payer.AddressBytes(),
+		KoinAddress: koinAddress.AddressBytes(),
 		Signature:   sig,
 	}
 
@@ -62,7 +62,7 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 		},
 	}
 
-	transaction, err := integration.CreateTransaction(c.client, []*protocol.Operation{op}, payer)
+	transaction, err := integration.CreateTransactionWithPayer(c.client, []*protocol.Operation{op}, payer.AddressBytes(), koinAddress)
 	if err != nil {
 		return nil, err
 	}

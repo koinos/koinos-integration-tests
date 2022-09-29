@@ -55,7 +55,7 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim delegation contract")
-	err = integration.UploadContract(client, "../../contracts/claim_delegation.wasm", claimDelegationKey)
+	err = integration.UploadSystemContract(client, "../../contracts/claim_delegation.wasm", claimDelegationKey)
 	integration.NoError(t, err)
 
 	koin := token.GetKoinToken(client)
@@ -64,6 +64,7 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 
 	// Mint 100 koin to the delegation contract address
+
 	koin.Mint(claimDelegationKey.AddressBytes(), 10000000000)
 	expectedSupply := uint64(10000000000)
 	checkSupply(t, koin, expectedSupply)
@@ -100,7 +101,7 @@ func TestClaim(t *testing.T) {
 
 	t.Logf("Submitting claim")
 
-	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, claimDelegationKey)
+	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, claimDelegationKey)
 	integration.NoError(t, err)
 	integration.LogBlockReceipt(t, receipt)
 	expectedSupply += claimAValue
@@ -121,7 +122,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, true)
 
 	t.Logf("Submitting duplicate claim")
-	receipt, err = submitClaim(t, cl, claimAAddress, claimAPrivKey, claimDelegationKey)
+	receipt, err = submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, claimDelegationKey)
 	integration.NoError(t, err)
 	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
 	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
@@ -134,7 +135,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, true)
 
 	t.Logf("Submitting a claim with the wrong signature")
-	receipt, err = submitClaim(t, cl, claimBAddress, claimAPrivKey, claimDelegationKey)
+	receipt, err = submitClaim(t, cl, claimBAddress, claimAPrivKey, aliceKey, claimDelegationKey)
 	integration.NoError(t, err)
 	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
 	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
@@ -147,7 +148,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, false)
 
 	t.Logf("Submitting a claim on a non-existent address")
-	_, err = submitClaim(t, cl, bogusAddress, claimAPrivKey, claimDelegationKey)
+	_, err = submitClaim(t, cl, bogusAddress, claimAPrivKey, aliceKey, claimDelegationKey)
 	integration.NoError(t, err)
 	require.EqualValues(t, len(receipt.TransactionReceipts), 1)
 	require.EqualValues(t, receipt.TransactionReceipts[0].Reverted, true)
@@ -163,7 +164,7 @@ func TestClaim(t *testing.T) {
 	expectedAliceBalance := expectedSupply
 	expectedBobBalance := 0
 
-	_, err = submitClaim(t, cl, claimBAddress, claimBPrivKey, claimDelegationKey)
+	_, err = submitClaim(t, cl, claimBAddress, claimBPrivKey, bobKey, claimDelegationKey)
 	integration.NoError(t, err)
 	expectedSupply += claimBValue
 	expectedBobBalance += claimBValue
@@ -187,7 +188,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.TokenAmount, claimBValue)
 	require.EqualValues(t, claim.Claimed, true)
 
-	_, err = submitClaim(t, cl, claimCAddress, claimCPrivKey, claimDelegationKey)
+	_, err = submitClaim(t, cl, claimCAddress, claimCPrivKey, bobKey, claimDelegationKey)
 	integration.NoError(t, err)
 	expectedSupply += claimCValue
 	expectedBobBalance += claimCValue
@@ -211,7 +212,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.TokenAmount, claimCValue)
 	require.EqualValues(t, claim.Claimed, true)
 
-	_, err = submitClaim(t, cl, claimDAddress, claimDPrivKey, claimDelegationKey)
+	_, err = submitClaim(t, cl, claimDAddress, claimDPrivKey, bobKey, claimDelegationKey)
 	integration.NoError(t, err)
 	expectedSupply += claimDValue
 	expectedBobBalance += claimDValue
@@ -236,14 +237,14 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, true)
 }
 
-func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, payerKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
+func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinKey *util.KoinosKey, payerKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
 	claimPubKey, err := hex.DecodeString(pubKey)
 	integration.NoError(t, err)
 
 	claimPrivKey, err := hex.DecodeString(privKey)
 	integration.NoError(t, err)
 
-	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, payerKey)
+	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, koinKey, payerKey)
 }
 
 func checkClaim(t *testing.T, cl *claimUtil.Claim, address string) (*claim.ClaimStatus, error) {
