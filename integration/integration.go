@@ -622,7 +622,7 @@ func CreateTransactionWithPayer(client Client, ops []*protocol.Operation, payer 
 		return nil, err
 	}
 
-	rcLimit, err := GetAccountRc(client, address)
+	rcLimit, err := GetAccountRc(client, payer)
 	if err != nil {
 		return nil, err
 	}
@@ -648,7 +648,7 @@ func CreateTransactionWithPayer(client Client, ops []*protocol.Operation, payer 
 	}
 
 	// Create the transaction
-	header := protocol.TransactionHeader{ChainId: chainID, RcLimit: rcLimit, Nonce: nonceBytes, OperationMerkleRoot: merkleRoot, Payer: payer}
+	header := protocol.TransactionHeader{ChainId: chainID, RcLimit: rcLimit, Nonce: nonceBytes, OperationMerkleRoot: merkleRoot, Payer: payer, Payee: address}
 	transaction := &protocol.Transaction{Header: &header, Operations: ops}
 
 	if mod != nil {

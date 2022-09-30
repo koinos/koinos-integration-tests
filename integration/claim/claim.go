@@ -28,7 +28,50 @@ type Claim struct {
 }
 
 // SubmitClaim to the claim contract
-func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, koinAddress *util.KoinosKey, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
+func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
+	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
+
+	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(payer.AddressBytes())
+	fullMessageStr := fmt.Sprintf("\x19Ethereum Signed Message:\n%d%s", len(messageStr), messageStr)
+
+	h := crypto.Keccak256Hash([]byte(fullMessageStr))
+
+	sig, err := btcec.SignCompact(btcec.S256(), pk, h.Bytes(), true)
+	if err != nil {
+		return nil, err
+	}
+
+	claimArgs := &claim.ClaimArguments{
+		EthAddress:  ethAddress,
+		KoinAddress: payer.AddressBytes(),
+		Signature:   sig,
+	}
+
+	args, err := proto.Marshal(claimArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: c.key.AddressBytes(),
+				EntryPoint: claimEntry,
+				Args:       args,
+			},
+		},
+	}
+
+	transaction, err := integration.CreateTransaction(c.client, []*protocol.Operation{op}, payer)
+	if err != nil {
+		return nil, err
+	}
+
+	return integration.CreateBlock(c.client, []*protocol.Transaction{transaction})
+}
+
+// SubmitClaimWithDelegation to the claim contract
+func (c *Claim) SubmitClaimWithDelegation(t *testing.T, ethAddress []byte, privateKey []byte, koinAddress *util.KoinosKey, payer *util.KoinosKey) (*protocol.BlockReceipt, error) {
 	pk, _ := btcec.PrivKeyFromBytes(btcec.S256(), privateKey)
 
 	messageStr := "claim koins 0x" + hex.EncodeToString(ethAddress) + ":" + base58.Encode(koinAddress.AddressBytes())
@@ -62,7 +105,26 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 		},
 	}
 
-	transaction, err := integration.CreateTransactionWithPayer(c.client, []*protocol.Operation{op}, payer.AddressBytes(), koinAddress)
+	transaction, err := integration.CreateTransaction(
+		c.client,
+		[]*protocol.Operation{op},
+		koinAddress,
+		func(t *protocol.Transaction) error {
+			t.Header.Payee = koinAddress.AddressBytes()
+			t.Header.Payer = payer.AddressBytes()
+
+			rcLimit, err := integration.GetAccountRc(c.client, t.Header.Payer)
+			if err != nil {
+				return err
+			}
+
+			t.Header.RcLimit = rcLimit
+
+			return nil
+		},
+	)
+
+	//transaction, err := integration.CreateTransactionWithPayer(c.client, []*protocol.Operation{op}, payer.AddressBytes(), koinAddress)
 	if err != nil {
 		return nil, err
 	}
