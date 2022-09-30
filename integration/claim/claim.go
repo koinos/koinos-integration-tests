@@ -124,7 +124,6 @@ func (c *Claim) SubmitClaimWithDelegation(t *testing.T, ethAddress []byte, priva
 		},
 	)
 
-	//transaction, err := integration.CreateTransactionWithPayer(c.client, []*protocol.Operation{op}, payer.AddressBytes(), koinAddress)
 	if err != nil {
 		return nil, err
 	}
