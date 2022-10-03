@@ -45,18 +45,20 @@ const (
 	Resources
 	Vhp
 	Claim
+	ClaimDelegation
 )
 
 var wifMap = map[int]string{
-	Genesis:     "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
-	Governance:  "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV",
-	Koin:        "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH",
-	Pob:         "5JChmh7kJTLLToW7Et45w6fULWAq7S6USLYDaRydyE6aa42U557",
-	PobProducer: "5JMYdb7hMY78q3U2Yro6ZSJiYE7uvt9m6HBbeF8rA9fGEPD14US",
-	Pow:         "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
-	Resources:   "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
-	Vhp:         "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
-	Claim:       "5HwGceo2dySLQencsReyEHfbRRyJWTowhUVw1jVj3QGdm4Aai4N",
+	Genesis:         "5KYPA63Gx4MxQUqDM3PMckvX9nVYDUaLigTKAsLPesTyGmKmbR2",
+	Governance:      "5KdCtpQ4DiFxgPd8VhexLwDfucJ83Mzc81ZviqU1APSzba8vNZV",
+	Koin:            "5JbxDqUqx581iL9Po1mLvHMLkxnmjvypDdnmdLQvK5TzSpCFSgH",
+	Pob:             "5JChmh7kJTLLToW7Et45w6fULWAq7S6USLYDaRydyE6aa42U557",
+	PobProducer:     "5JMYdb7hMY78q3U2Yro6ZSJiYE7uvt9m6HBbeF8rA9fGEPD14US",
+	Pow:             "5KKuscNqrWadRaCCt7oCF7kz6XdL4QMJE9MAnAVShA3JGJEze3p",
+	Resources:       "5J4f6NdoPEDow7oRuGvuD9ggjr1HvWzirjZP6sJKSvsNnKenyi3",
+	Vhp:             "5JdSPo7YMCb5rozFjHhwZ1qcKKbgKdvDqVzSkvr8XbZ8VoUf5re",
+	Claim:           "5HwGceo2dySLQencsReyEHfbRRyJWTowhUVw1jVj3QGdm4Aai4N",
+	ClaimDelegation: "5JDEvoENsqk2zD7vZ25im3Gd2zXFMVtC3LhqiMS1Ktuu3aVN6Vm",
 }
 
 const (
