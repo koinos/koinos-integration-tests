@@ -9,6 +9,7 @@ import (
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
+	tokenproto "github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	util "github.com/koinos/koinos-util-golang"
 	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
@@ -16,6 +17,8 @@ import (
 
 	"koinos-integration-tests/integration"
 	"testing"
+
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -258,6 +261,9 @@ func TestClaimDelegation(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, true)
 
 	t.Log("Ensure that KOIN can be removed from the claim delegation contract")
+	err = transferWithWrongKey(client, koinKey, bobKey, claimDelegationKey.AddressBytes(), bobAddress, delegationTokens)
+	require.Error(t, err, "bob should not authorize transfer from claim delegation contract")
+
 	err = koin.Transfer(claimDelegationKey, bobAddress, delegationTokens)
 	integration.NoError(t, err)
 
@@ -318,4 +324,36 @@ func checkSupply(t *testing.T, koin *token.Token, expected uint64) {
 	t.Logf("Total supply returned is %d", supply)
 	integration.NoError(t, err)
 	require.EqualValues(t, expected, supply, "total supply mismatch")
+}
+
+func transferWithWrongKey(client integration.Client, koinKey *util.KoinosKey, signerKey *util.KoinosKey, from []byte, to []byte, value uint64) error {
+	const transferEntry uint32 = 0x27f576ca
+	transferArgs := &tokenproto.TransferArguments{
+		From:  from,
+		To:    to,
+		Value: value,
+	}
+
+	args, err := proto.Marshal(transferArgs)
+	if err != nil {
+		return err
+	}
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: koinKey.AddressBytes(),
+				EntryPoint: transferEntry,
+				Args:       args,
+			},
+		},
+	}
+
+	transaction, err := integration.CreateTransaction(client, []*protocol.Operation{op}, signerKey)
+	if err != nil {
+		return err
+	}
+
+	_, err = integration.SubmitTransaction(client, transaction)
+	return err
 }
