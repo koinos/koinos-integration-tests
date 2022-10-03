@@ -34,7 +34,7 @@ const (
 	bogusAddress  = "DEADBEEFDEADBEEFDEADBEEFDEADBEEFDEADBEEF"
 )
 
-func TestClaim(t *testing.T) {
+func TestClaimDelegation(t *testing.T) {
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
 	claimKey, err := integration.GetKey(integration.Claim)
@@ -94,6 +94,14 @@ func TestClaim(t *testing.T) {
 
 	checkSupply(t, koin, expectedSupply)
 
+	t.Logf("Minting to Bob")
+	koin.Mint(bobAddress, 1)
+	expectedSupply += 1
+	bobBalance, err := koin.Balance(bobAddress)
+	integration.NoError(t, err)
+
+	checkSupply(t, koin, expectedSupply)
+
 	err = integration.SetSystemCallOverride(client, koinKey, uint32(0x2d464aab), uint32(chain.SystemCallId_get_account_rc))
 	integration.NoError(t, err)
 
@@ -126,7 +134,7 @@ func TestClaim(t *testing.T) {
 
 	aliceBalance, err := koin.Balance(aliceAddress)
 	integration.NoError(t, err)
-	require.EqualValues(t, expectedSupply-delegationTokens, aliceBalance, "alice balance mismatch")
+	require.EqualValues(t, expectedSupply-delegationTokens-bobBalance, aliceBalance, "alice balance mismatch")
 
 	testInfo(t, cl, info)
 
@@ -136,7 +144,7 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, true)
 
 	t.Logf("Submitting duplicate claim")
-	receipt, err = submitClaimWithDelegation(t, cl, claimAAddress, claimAPrivKey, aliceKey, claimDelegationKey)
+	_, err = submitClaimWithDelegation(t, cl, claimAAddress, claimAPrivKey, aliceKey, claimDelegationKey)
 	require.Error(t, err)
 
 	testInfo(t, cl, info)
@@ -171,8 +179,11 @@ func TestClaim(t *testing.T) {
 	require.EqualValues(t, claim.Claimed, false)
 
 	t.Logf("Submit remainder of claims")
-	expectedAliceBalance := expectedSupply - delegationTokens
-	expectedBobBalance := 0
+	expectedAliceBalance := expectedSupply - delegationTokens - bobBalance
+	expectedBobBalance := 1
+
+	_, err = submitClaim(t, cl, claimBAddress, claimBPrivKey, bobKey)
+	require.Error(t, err, "should have insufficient rc")
 
 	_, err = submitClaimWithDelegation(t, cl, claimBAddress, claimBPrivKey, bobKey, claimDelegationKey)
 	integration.NoError(t, err)
@@ -187,7 +198,7 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 	require.EqualValues(t, expectedAliceBalance, aliceBalance, "alice balance mismatch")
 
-	bobBalance, err := koin.Balance(bobAddress)
+	bobBalance, err = koin.Balance(bobAddress)
 	integration.NoError(t, err)
 	require.EqualValues(t, expectedBobBalance, bobBalance, "bob balance mismatch")
 
@@ -245,6 +256,33 @@ func TestClaim(t *testing.T) {
 	integration.NoError(t, err)
 	require.EqualValues(t, claim.TokenAmount, claimDValue)
 	require.EqualValues(t, claim.Claimed, true)
+
+	t.Log("Ensure that KOIN can be removed from the claim delegation contract")
+	err = koin.Transfer(claimDelegationKey, bobAddress, delegationTokens)
+	integration.NoError(t, err)
+
+	claimDelegationBalance, err := koin.Balance(claimDelegationKey.AddressBytes())
+	integration.NoError(t, err)
+
+	require.EqualValues(t, 0, claimDelegationBalance, "claim delegation contract should have 0 KOIN")
+
+	t.Log("Ensure claim delegation KOIN has been transferred to Bob")
+	expectedBobBalance += int(delegationTokens)
+	bobBalance, err = koin.Balance(bobAddress)
+	integration.NoError(t, err)
+	require.EqualValues(t, expectedBobBalance, bobBalance, "bob balance mismatch")
+
+	checkSupply(t, koin, expectedSupply)
+}
+
+func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinosKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
+	claimPubKey, err := hex.DecodeString(pubKey)
+	integration.NoError(t, err)
+
+	claimPrivKey, err := hex.DecodeString(privKey)
+	integration.NoError(t, err)
+
+	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, koinosKey)
 }
 
 func submitClaimWithDelegation(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinKey *util.KoinosKey, payerKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
