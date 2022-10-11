@@ -58,6 +58,7 @@ func TestGovernance(t *testing.T) {
 	integration.NoError(t, err)
 
 	maxRc, err := integration.GetAccountRc(client, governanceKey.AddressBytes())
+	integration.NoError(t, err)
 	t.Logf("Governance max RC: %d", maxRc)
 
 	t.Logf("Overriding pre_block system call")
@@ -149,7 +150,7 @@ func testProposalFees(t *testing.T, client integration.Client) {
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 2, len(receipt.TransactionReceipts[0].Events), "Expected 2 transaction events")
-	require.EqualValues(t, "koin.burn", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
+	require.EqualValues(t, "koinos.contracts.token.burn_event", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
 }
 
 func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
@@ -188,8 +189,8 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
 	require.EqualValues(t, 2, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "koin.burn", blockEvents[0].Name, "Expected 'koin.burn' event in block receipt")
-	require.EqualValues(t, "proposal.submission", blockEvents[1].Name, "Expected 'proposal.submission' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.token.burn_event", blockEvents[0].Name, "Expected 'koinos.contracts.token.burn_event' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[1].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	t.Logf("Querying proposals")
 	proposals, err = gov.GetProposals()
@@ -243,7 +244,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	blockEvents = integration.EventsFromBlockReceipt(receipt)
 	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	var statusEvent governance.ProposalStatusEvent
 	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
@@ -301,7 +302,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	for _, receipt := range receipts {
 		blockEvents = integration.EventsFromBlockReceipt(receipt)
 		require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-		require.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
+		require.EqualValues(t, "koinos.contracts.governance.proposal_vote_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_vote_event' event in block receipt")
 	}
 
 	receipts, err = integration.CreateBlocks(client, (VotePeriod*(100-threshold)/100)-1, logPerK, genesisKey)
@@ -319,7 +320,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 
 	blockEvents = integration.EventsFromBlockReceipt(receipt)
 	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
 	integration.NoError(t, err)
@@ -377,7 +378,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	integration.LogBlockReceipt(t, receipt)
 
 	require.EqualValues(t, 1, len(receipt.Events), "Expected 3 event within the block receipt")
-	require.EqualValues(t, "proposal.status", receipt.Events[0].Name, "Expected 'proposal.status' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", receipt.Events[0].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	err = proto.Unmarshal(receipt.Events[0].Data, &statusEvent)
 	integration.NoError(t, err)
@@ -426,8 +427,8 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
 	require.EqualValues(t, 2, len(blockEvents), "Expected 2 event within the block receipt")
-	require.EqualValues(t, "koin.burn", blockEvents[0].Name, "Expected 'koin.burn' event in block receipt")
-	require.EqualValues(t, "proposal.submission", blockEvents[1].Name, "Expected 'proposal.submission' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.token.burn_event", blockEvents[0].Name, "Expected 'koinos.contracts.token.burn_event' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[1].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	t.Logf("Querying proposals")
 	proposals, err = gov.GetProposals()
@@ -481,7 +482,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	blockEvents = integration.EventsFromBlockReceipt(receipt)
 	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	var statusEvent governance.ProposalStatusEvent
 	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
@@ -540,7 +541,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 		integration.LogBlockReceipt(t, receipt)
 		blockEvents = integration.EventsFromBlockReceipt(receipt)
 		require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-		require.EqualValues(t, "proposal.vote", blockEvents[0].Name, "Expected 'proposal.vote' event in block receipt")
+		require.EqualValues(t, "koinos.contracts.governance.proposal_vote_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_vote_event' event in block receipt")
 	}
 
 	receipts, err = integration.CreateBlocks(client, (VotePeriod * (100 - threshold) / 100), logPerK, genesisKey)
@@ -558,7 +559,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 
 	blockEvents = integration.EventsFromBlockReceipt(receipt)
 	require.EqualValues(t, 1, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "proposal.status", blockEvents[0].Name, "Expected 'proposal.status' event in block receipt")
+	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[0].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	err = proto.Unmarshal(blockEvents[0].Data, &statusEvent)
 	integration.NoError(t, err)
