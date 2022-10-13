@@ -1,15 +1,18 @@
 package resource
 
 import (
+	"context"
 	"fmt"
 	"koinos-integration-tests/integration"
 	"koinos-integration-tests/integration/token"
 	"testing"
+	"time"
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/resources"
 	token_proto "github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
+	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	util "github.com/koinos/koinos-util-golang"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -288,9 +291,19 @@ func TestResource(t *testing.T) {
 		markets, err = getMarkets(client, resourceKey.AddressBytes())
 		integration.NoError(t, err)
 
+		limitsReq := &chainrpc.GetResourceLimitsRequest{}
+		limitsResp := &chainrpc.GetResourceLimitsResponse{}
+
+		limitsCtx, limitsTimeout := context.WithTimeout(context.Background(), time.Second)
+		defer limitsTimeout()
+		client.Call(limitsCtx, "chain.get_resource_limits", limitsReq, limitsResp)
+
 		require.EqualValues(t, testValues[i].DiskSupply, markets.DiskStorage.ResourceSupply)
+		require.EqualValues(t, testValues[i].DiskCost, limitsResp.ResourceLimitData.DiskStorageCost)
 		require.EqualValues(t, testValues[i].NetworkSupply, markets.NetworkBandwidth.ResourceSupply)
+		require.EqualValues(t, testValues[i].NetworkCost, limitsResp.ResourceLimitData.NetworkBandwidthCost)
 		require.EqualValues(t, testValues[i].ComputeSupply, markets.ComputeBandwidth.ResourceSupply)
+		require.EqualValues(t, testValues[i].ComputeCost, limitsResp.ResourceLimitData.ComputeBandwidthCost)
 	}
 
 	fmt.Print("]\n")
