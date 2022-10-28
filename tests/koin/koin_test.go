@@ -28,8 +28,10 @@ func TestKoin(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
 	integration.NoError(t, err)
 
 	t.Logf("Minting 1000 satoshis to alice")

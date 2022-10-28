@@ -51,12 +51,14 @@ func TestClaimDelegation(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim contract")
-	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey)
+	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey, "claim")
 	integration.NoError(t, err)
 
 	fmt.Printf("Claim contract: %v\n", base64.StdEncoding.EncodeToString(claimKey.AddressBytes()))

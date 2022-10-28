@@ -82,7 +82,7 @@ type Client interface {
 	Call(ctx context.Context, method string, params proto.Message, returnType proto.Message) error
 }
 
-func InitNameService(client Client, t *testing.T) {
+func InitNameService(t *testing.T, client Client) {
 	nameServiceKey, err := GetKey(NameService)
 	NoError(t, err)
 

@@ -46,12 +46,14 @@ func TestGovernance(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
 	integration.NoError(t, err)
 
 	t.Logf("Uploading governance contract")
-	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, func(op *protocol.UploadContractOperation) error {
+	err = integration.UploadSystemContract(client, "../../contracts/governance.wasm", governanceKey, "governance", func(op *protocol.UploadContractOperation) error {
 		op.AuthorizesTransactionApplication = true
 		return nil
 	})

@@ -29,7 +29,7 @@ func TestNameService(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	t.Logf("Uploading Name Service contract")
-	err = integration.UploadSystemContract(client, "../../contracts/name_service.wasm", nameServiceKey)
+	err = integration.UploadSystemContract(client, "../../contracts/name_service.wasm", nameServiceKey, "name_service")
 	integration.NoError(t, err)
 
 	t.Logf("Overriding get_contract_name")
