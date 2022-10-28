@@ -77,11 +77,11 @@ func TestResource(t *testing.T) {
 	integration.InitNameService(t, client)
 
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
+	_, err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
 	integration.NoError(t, err)
 
 	t.Logf("Uploading Resource contract")
-	err = integration.UploadSystemContract(client, "../../contracts/resources.wasm", resourceKey, "resources")
+	_, err = integration.UploadSystemContract(client, "../../contracts/resources.wasm", resourceKey, "resources")
 
 	t.Logf("Minting 50M tKOIN to alice")
 	koin := token.GetKoinToken(client)

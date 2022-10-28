@@ -73,6 +73,7 @@ const (
 	GetChainIDCall        = "chain.get_chain_id"
 	GetContractMetaCall   = "contract_meta_store.get_contract_meta"
 	GetHeadInfoCall       = "chain.get_head_info"
+	SubmitBlockCall       = "chain.submit_block"
 
 	defaultTimeout = time.Second
 )
@@ -87,7 +88,7 @@ func InitNameService(t *testing.T, client Client) {
 	NoError(t, err)
 
 	t.Logf("Uploading Name Service contract")
-	err = UploadSystemContract(client, "../../contracts/name_service.wasm", nameServiceKey, "name_service")
+	_, err = UploadSystemContract(client, "../../contracts/name_service.wasm", nameServiceKey, "name_service")
 	NoError(t, err)
 
 	t.Logf("Overriding get_contract_name")
@@ -476,7 +477,7 @@ func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...in
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	err = client.Call(ctx, "chainrpc.submit_block", &chainrpc.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	err = client.Call(ctx, SubmitBlockCall, &chainrpc.SubmitBlockRequest{Block: block}, &submitBlockResp)
 	if err != nil {
 		return nil, err
 	}
@@ -773,7 +774,7 @@ func UploadContract(client Client, file string, key *util.KoinosKey, mods ...fun
 }
 
 // UploadSystemContract uploads a contract and sets it as a system contract
-func UploadSystemContract(client Client, file string, key *util.KoinosKey, name string, mods ...func(b *protocol.UploadContractOperation) error) error {
+func UploadSystemContract(client Client, file string, key *util.KoinosKey, name string, mods ...func(b *protocol.UploadContractOperation) error) (*protocol.BlockReceipt, error) {
 	var mod func(b *protocol.UploadContractOperation) error = nil
 
 	if len(mods) > 0 {
@@ -782,7 +783,7 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey, name 
 
 	wasm, err := BytesFromFile(file, 512000)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	uco := protocol.UploadContractOperation{}
@@ -798,18 +799,18 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey, name 
 	if mod != nil {
 		err = mod(uploadOperation.GetUploadContract())
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
 	transaction1, err := CreateTransaction(client, []*protocol.Operation{uploadOperation}, key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	genesisKey, err := GetKey(Genesis)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	ssc := protocol.SetSystemContractOperation{}
@@ -822,12 +823,8 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey, name 
 		},
 	}
 
-	transaction2, err := CreateTransaction(client, []*protocol.Operation{setSystemContractOperation}, genesisKey)
-	if err != nil {
-		return err
-	}
-
 	// Set name service mapping
+
 	setRecordArgs := &name_service.SetRecordArguments{
 		Name:    name,
 		Address: key.AddressBytes(),
@@ -835,26 +832,30 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey, name 
 
 	args, err := proto.Marshal(setRecordArgs)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	op := &protocol.Operation{
+	nsKey, err := GetKey(NameService)
+	if err != nil {
+		return nil, err
+	}
+
+	setNameOperation := &protocol.Operation{
 		Op: &protocol.Operation_CallContract{
 			CallContract: &protocol.CallContractOperation{
-				ContractId: key.AddressBytes(),
+				ContractId: nsKey.AddressBytes(),
 				EntryPoint: uint32(0xe248c73a),
 				Args:       args,
 			},
 		},
 	}
 
-	nameTransaction, err := CreateTransaction(client, []*protocol.Operation{op}, genesisKey)
+	transaction2, err := CreateTransaction(client, []*protocol.Operation{setSystemContractOperation, setNameOperation}, genesisKey)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	_, err = CreateBlock(client, []*protocol.Transaction{transaction1, transaction2, nameTransaction})
-	return err
+	return CreateBlock(client, []*protocol.Transaction{transaction1, transaction2})
 }
 
 // EventsFromBlockReceipt parses a block receipt, returning all events contained within the receipt
