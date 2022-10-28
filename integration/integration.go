@@ -17,10 +17,12 @@ import (
 	"github.com/btcsuite/btcutil/base58"
 	koinosmq "github.com/koinos/koinos-mq-golang"
 	"github.com/koinos/koinos-proto-golang/koinos/canonical"
+	"github.com/koinos/koinos-proto-golang/koinos/chain"
+	name_service "github.com/koinos/koinos-proto-golang/koinos/contracts/name-service"
 	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
 	cmsrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/contract_meta_store"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/mempool"
 	"github.com/koinos/koinos-proto-golang/koinos/rpc/p2p"
@@ -80,11 +82,28 @@ type Client interface {
 	Call(ctx context.Context, method string, params proto.Message, returnType proto.Message) error
 }
 
-// GetHeadInfo gets the head info of the chain
-func GetHeadInfo(client Client) (*chain.GetHeadInfoResponse, error) {
-	params := chain.GetHeadInfoRequest{}
+func InitNameService(client Client, t *testing.T) {
+	nameServiceKey, err := GetKey(NameService)
+	NoError(t, err)
 
-	headInfo := &chain.GetHeadInfoResponse{}
+	t.Logf("Uploading Name Service contract")
+	err = UploadSystemContract(client, "../../contracts/name_service.wasm", nameServiceKey, "name_service")
+	NoError(t, err)
+
+	t.Logf("Overriding get_contract_name")
+	err = SetSystemCallOverride(client, nameServiceKey, uint32(0xe5070a16), uint32(chain.SystemCallId_get_contract_name))
+	NoError(t, err)
+
+	t.Logf("Overriding get_contract_address")
+	err = SetSystemCallOverride(client, nameServiceKey, uint32(0xa61ae5e8), uint32(chain.SystemCallId_get_contract_address))
+	NoError(t, err)
+}
+
+// GetHeadInfo gets the head info of the chain
+func GetHeadInfo(client Client) (*chainrpc.GetHeadInfoResponse, error) {
+	params := chainrpc.GetHeadInfoRequest{}
+
+	headInfo := &chainrpc.GetHeadInfoResponse{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -100,12 +119,12 @@ func GetHeadInfo(client Client) (*chain.GetHeadInfoResponse, error) {
 // GetAccountNonce gets the nonce of a given account
 func GetAccountNonce(client Client, address []byte) (uint64, error) {
 	// Build the contract request
-	params := chain.GetAccountNonceRequest{
+	params := chainrpc.GetAccountNonceRequest{
 		Account: address,
 	}
 
 	// Make the rpc call
-	var cResp chain.GetAccountNonceResponse
+	var cResp chainrpc.GetAccountNonceResponse
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -124,12 +143,12 @@ func GetAccountNonce(client Client, address []byte) (uint64, error) {
 }
 
 // ReadContract reads from the given contract and returns the response
-func ReadContract(client Client, args []byte, contractID []byte, entryPoint uint32) (*chain.ReadContractResponse, error) {
+func ReadContract(client Client, args []byte, contractID []byte, entryPoint uint32) (*chainrpc.ReadContractResponse, error) {
 	// Build the contract request
-	params := chain.ReadContractRequest{ContractId: contractID, EntryPoint: entryPoint, Args: args}
+	params := chainrpc.ReadContractRequest{ContractId: contractID, EntryPoint: entryPoint, Args: args}
 
 	// Make the rpc call
-	var cResp chain.ReadContractResponse
+	var cResp chainrpc.ReadContractResponse
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -170,12 +189,12 @@ func GetAccountBalance(client Client, address []byte, contractID []byte, balance
 // GetAccountRc gets the rc of a given account
 func GetAccountRc(client Client, address []byte) (uint64, error) {
 	// Build the contract request
-	params := chain.GetAccountRcRequest{
+	params := chainrpc.GetAccountRcRequest{
 		Account: address,
 	}
 
 	// Make the rpc call
-	var cResp chain.GetAccountRcResponse
+	var cResp chainrpc.GetAccountRcResponse
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -191,10 +210,10 @@ func GetAccountRc(client Client, address []byte) (uint64, error) {
 // GetChainID gets the chain id
 func GetChainID(client Client) ([]byte, error) {
 	// Build the contract request
-	params := chain.GetChainIdRequest{}
+	params := chainrpc.GetChainIdRequest{}
 
 	// Make the rpc call
-	var cResp chain.GetChainIdResponse
+	var cResp chainrpc.GetChainIdResponse
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -224,7 +243,7 @@ func translateRequest(service string, method string, param proto.Message) ([]byt
 
 	switch service {
 	case "chain":
-		wrapped = &chain.ChainRequest{}
+		wrapped = &chainrpc.ChainRequest{}
 
 	case "block_store":
 		wrapped = &block_store.BlockStoreRequest{}
@@ -260,7 +279,7 @@ func translateResponse(service string, resBytes []byte, response proto.Message) 
 
 	switch service {
 	case "chain":
-		wrapped = &chain.ChainResponse{}
+		wrapped = &chainrpc.ChainResponse{}
 
 	case "block_store":
 		wrapped = &block_store.BlockStoreResponse{}
@@ -452,12 +471,12 @@ func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...in
 
 	block.Signature = signatureBytes
 
-	var submitBlockResp chain.SubmitBlockResponse
+	var submitBlockResp chainrpc.SubmitBlockResponse
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
 
-	err = client.Call(ctx, "chain.submit_block", &chain.SubmitBlockRequest{Block: block}, &submitBlockResp)
+	err = client.Call(ctx, "chainrpc.submit_block", &chainrpc.SubmitBlockRequest{Block: block}, &submitBlockResp)
 	if err != nil {
 		return nil, err
 	}
@@ -586,12 +605,12 @@ func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interfa
 
 func SubmitTransaction(client Client, transaction *protocol.Transaction) (*protocol.TransactionReceipt, error) {
 
-	request := &chain.SubmitTransactionRequest{
+	request := &chainrpc.SubmitTransactionRequest{
 		Transaction: transaction,
 		Broadcast:   true,
 	}
 
-	response := chain.SubmitTransactionResponse{}
+	response := chainrpc.SubmitTransactionResponse{}
 
 	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
 	defer cancel()
@@ -754,7 +773,7 @@ func UploadContract(client Client, file string, key *util.KoinosKey, mods ...fun
 }
 
 // UploadSystemContract uploads a contract and sets it as a system contract
-func UploadSystemContract(client Client, file string, key *util.KoinosKey, mods ...func(b *protocol.UploadContractOperation) error) error {
+func UploadSystemContract(client Client, file string, key *util.KoinosKey, name string, mods ...func(b *protocol.UploadContractOperation) error) error {
 	var mod func(b *protocol.UploadContractOperation) error = nil
 
 	if len(mods) > 0 {
@@ -808,7 +827,33 @@ func UploadSystemContract(client Client, file string, key *util.KoinosKey, mods 
 		return err
 	}
 
-	_, err = CreateBlock(client, []*protocol.Transaction{transaction1, transaction2})
+	// Set name service mapping
+	setRecordArgs := &name_service.SetRecordArguments{
+		Name:    name,
+		Address: key.AddressBytes(),
+	}
+
+	args, err := proto.Marshal(setRecordArgs)
+	if err != nil {
+		return err
+	}
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: key.AddressBytes(),
+				EntryPoint: uint32(0xe248c73a),
+				Args:       args,
+			},
+		},
+	}
+
+	nameTransaction, err := CreateTransaction(client, []*protocol.Operation{op}, genesisKey)
+	if err != nil {
+		return err
+	}
+
+	_, err = CreateBlock(client, []*protocol.Transaction{transaction1, transaction2, nameTransaction})
 	return err
 }
 
