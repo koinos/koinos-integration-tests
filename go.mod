@@ -7,7 +7,7 @@ require (
 	github.com/btcsuite/btcutil v1.0.2
 	github.com/ethereum/go-ethereum v1.10.21
 	github.com/koinos/koinos-mq-golang v0.0.0-20220319044422-57bccec4eb07
-	github.com/koinos/koinos-proto-golang v0.4.1-0.20220929173025-ac76a8266abe
+	github.com/koinos/koinos-proto-golang v0.4.1-0.20221017185513-64ffcf094873
 	github.com/koinos/koinos-util-golang v0.0.0-20220809223732-ae4a6f8736ca
 	github.com/mr-tron/base58 v1.2.0
 	github.com/multiformats/go-multihash v0.2.0

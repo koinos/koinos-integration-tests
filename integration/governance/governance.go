@@ -26,9 +26,9 @@ type Governance struct {
 
 // GetGoverance returns the goverance contract object
 func GetGovernance(client integration.Client) *Governance {
-	goverancneKey, _ := integration.GetKey(integration.Governance)
+	governanceKey, _ := integration.GetKey(integration.Governance)
 
-	return &Governance{key: goverancneKey, client: client}
+	return &Governance{key: governanceKey, client: client}
 }
 
 // SubmitProposal to the goverance contract
