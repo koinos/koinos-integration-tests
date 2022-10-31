@@ -24,8 +24,10 @@ func TestError(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading exit contract")
-	err = integration.UploadSystemContract(client, "../../contracts/exit.wasm", exitKey)
+	_, err = integration.UploadSystemContract(client, "../../contracts/exit.wasm", exitKey, "exit")
 	integration.NoError(t, err)
 
 	t.Logf("Calling exit contract with reversion")

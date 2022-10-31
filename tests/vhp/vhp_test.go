@@ -29,8 +29,10 @@ func TestVhp(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading VHP contract")
-	err = integration.UploadSystemContract(client, "../../contracts/vhp.wasm", vhpKey)
+	_, err = integration.UploadSystemContract(client, "../../contracts/vhp.wasm", vhpKey, "vhp")
 	integration.NoError(t, err)
 
 	t.Logf("Minting 1000 satoshis to alice")

@@ -3,8 +3,8 @@ package claim_delegation
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	claimUtil "koinos-integration-tests/integration/claim"
+	"koinos-integration-tests/integration/name_service"
 	"koinos-integration-tests/integration/token"
 
 	"github.com/koinos/koinos-proto-golang/koinos/chain"
@@ -46,22 +46,34 @@ func TestClaimDelegation(t *testing.T) {
 	koinKey, err := integration.GetKey(integration.Koin)
 	integration.NoError(t, err)
 
+	governanceKey, err := integration.GetKey(integration.Governance)
+	integration.NoError(t, err)
+
 	claimDelegationKey, err := integration.GetKey(integration.ClaimDelegation)
 	integration.NoError(t, err)
 
 	integration.AwaitChain(t, client)
 
+	integration.InitNameService(t, client)
+
 	t.Logf("Uploading KOIN contract")
-	err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey)
+	_, err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
 	integration.NoError(t, err)
 
 	t.Logf("Uploading claim contract")
-	err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey)
+	_, err = integration.UploadSystemContract(client, "../../contracts/claim.wasm", claimKey, "claim")
 	integration.NoError(t, err)
 
-	fmt.Printf("Claim contract: %v\n", base64.StdEncoding.EncodeToString(claimKey.AddressBytes()))
-	fmt.Printf("Claim delegation contract: %v\n", base64.StdEncoding.EncodeToString(claimDelegationKey.AddressBytes()))
-	fmt.Printf("Koin contract: %v\n", base64.StdEncoding.EncodeToString(koinKey.AddressBytes()))
+	ns := name_service.GetNameService(client)
+	genesisKey, err := integration.GetKey(integration.Genesis)
+	integration.NoError(t, err)
+
+	_, err = ns.SetRecord(t, genesisKey, "governance", governanceKey.AddressBytes())
+	integration.NoError(t, err)
+
+	t.Logf("Claim contract: %v\n", base64.StdEncoding.EncodeToString(claimKey.AddressBytes()))
+	t.Logf("Claim delegation contract: %v\n", base64.StdEncoding.EncodeToString(claimDelegationKey.AddressBytes()))
+	t.Logf("Koin contract: %v\n", base64.StdEncoding.EncodeToString(koinKey.AddressBytes()))
 
 	t.Logf("Uploading claim delegation contract")
 	err = integration.UploadContract(
