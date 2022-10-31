@@ -3,7 +3,6 @@ package claim_delegation
 import (
 	"encoding/base64"
 	"encoding/hex"
-	"fmt"
 	claimUtil "koinos-integration-tests/integration/claim"
 	"koinos-integration-tests/integration/name_service"
 	"koinos-integration-tests/integration/token"
@@ -73,9 +72,9 @@ func TestClaimDelegation(t *testing.T) {
 	_, err = ns.SetRecord(t, genesisKey, "governance", governanceKey.AddressBytes())
 	integration.NoError(t, err)
 
-	fmt.Printf("Claim contract: %v\n", base64.StdEncoding.EncodeToString(claimKey.AddressBytes()))
-	fmt.Printf("Claim delegation contract: %v\n", base64.StdEncoding.EncodeToString(claimDelegationKey.AddressBytes()))
-	fmt.Printf("Koin contract: %v\n", base64.StdEncoding.EncodeToString(koinKey.AddressBytes()))
+	t.Logf("Claim contract: %v\n", base64.StdEncoding.EncodeToString(claimKey.AddressBytes()))
+	t.Logf("Claim delegation contract: %v\n", base64.StdEncoding.EncodeToString(claimDelegationKey.AddressBytes()))
+	t.Logf("Koin contract: %v\n", base64.StdEncoding.EncodeToString(koinKey.AddressBytes()))
 
 	t.Logf("Uploading claim delegation contract")
 	err = integration.UploadContract(
