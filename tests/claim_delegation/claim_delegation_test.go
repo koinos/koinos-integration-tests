@@ -67,8 +67,7 @@ func TestClaimDelegation(t *testing.T) {
 	ns := name_service.GetNameService(client)
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
-	governanceKey, err := integration.GetKey(integration.Governance)
-	integration.NoError(t, err)
+
 	_, err = ns.SetRecord(t, genesisKey, "governance", governanceKey.AddressBytes())
 	integration.NoError(t, err)
 
