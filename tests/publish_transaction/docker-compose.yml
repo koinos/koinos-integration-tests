@@ -19,7 +19,7 @@ services:
          - config_volume:/root/.koinos
       depends_on:
          - node_config
-      command: -a amqp://guest:guest@amqp:5672/ -l /tcp/8080 --log-level debug
+      command: -a amqp://guest:guest@amqp:5672/ -L /tcp/8080 --log-level debug
 
    mempool:
       image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
