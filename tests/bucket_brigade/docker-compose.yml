@@ -37,7 +37,7 @@ services:
     depends_on:
       - amqp_producer
       - producer_config
-    command: -a amqp://guest:guest@amqp_producer:5672/ -l /ip4/0.0.0.0/tcp/8080
+    command: -a amqp://guest:guest@amqp_producer:5672/ -L /ip4/0.0.0.0/tcp/8080
 
   mempool_producer:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
@@ -158,7 +158,7 @@ services:
     depends_on:
       - amqp_bucket2
       - bucket2_config
-    command: -a amqp://guest:guest@amqp_bucket2:5672/ -l /tcp/8080
+    command: -a amqp://guest:guest@amqp_bucket2:5672/ -L /tcp/8080
 
   mempool_bucket2:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
