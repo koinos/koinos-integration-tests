@@ -84,12 +84,16 @@ func TestClaim(t *testing.T) {
 
 	integration.NoError(t, err)
 
+	t.Logf("Submitting claim with missing signature of Koinos address")
+	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, bobKey)
+	integration.NoError(t, err)
+	require.EqualValues(t, 1, len(receipt.GetTransactionReceipts()), "expected 1 transaction receipt")
+	require.EqualValues(t, 1, len(receipt.GetTransactionReceipts()[0].GetLogs()), "expected 1 log entry")
+	require.EqualValues(t, true, receipt.GetTransactionReceipts()[0].Reverted, "expected transaction to be reverted")
+	require.EqualValues(t, "transaction reverted: transaction was not signed by the destination KOIN address", receipt.GetTransactionReceipts()[0].GetLogs()[0], "expected reversion with missing signature from koinos address")
+
 	t.Logf("Submitting claim")
-
-	_, err = submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, bobKey)
-	require.Error(t, err, "claim should be rejected due to mismatch of koin address signature")
-
-	receipt, err := submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, aliceKey)
+	receipt, err = submitClaim(t, cl, claimAAddress, claimAPrivKey, aliceKey, aliceKey)
 	integration.NoError(t, err)
 	integration.LogBlockReceipt(t, receipt)
 	expectedSupply += claimAValue

@@ -43,7 +43,7 @@ func (c *Claim) SubmitClaim(t *testing.T, ethAddress []byte, privateKey []byte, 
 
 	claimArgs := &claim.ClaimArguments{
 		EthAddress:  ethAddress,
-		KoinAddress: payer.AddressBytes(),
+		KoinAddress: koinAddress.AddressBytes(),
 		Signature:   sig,
 	}
 
