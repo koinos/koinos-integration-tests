@@ -300,7 +300,7 @@ func submitClaim(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey strin
 	claimPrivKey, err := hex.DecodeString(privKey)
 	integration.NoError(t, err)
 
-	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, koinosKey)
+	return cl.SubmitClaim(t, claimPubKey, claimPrivKey, koinosKey, koinosKey)
 }
 
 func submitClaimWithDelegation(t *testing.T, cl *claimUtil.Claim, pubKey string, privKey string, koinKey *util.KoinosKey, payerKey *util.KoinosKey) (*protocol.BlockReceipt, error) {
