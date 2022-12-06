@@ -131,10 +131,16 @@ func TestPob(t *testing.T) {
 	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
 	integration.NoError(t, err)
 
-	require.EqualValues(t, len(receipt.TransactionReceipts), 1, "Expected 1 transaction receipt")
-	require.EqualValues(t, len(receipt.TransactionReceipts[0].Events), 1, "Expected 1 events in transaction receipt")
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction receipt")
+	require.EqualValues(t, 1, len(receipt.TransactionReceipts[0].Events), "Expected 1 events in transaction receipt")
+	require.EqualValues(t, pobKey.AddressBytes(), receipt.TransactionReceipts[0].Events[0].Source, "Unexpected event source on register public key event")
 
-	// TODO: Check event
+	registerPublicKeyEvent := &pob.RegisterPublicKeyEvent{}
+	err = proto.Unmarshal(receipt.TransactionReceipts[0].Events[0].Data, registerPublicKeyEvent)
+	integration.NoError(t, err)
+
+	require.EqualValues(t, producerKey.AddressBytes(), registerPublicKeyEvent.Address, "Unexpected address on register public key event")
+	require.EqualValues(t, producerKey.PublicBytes(), registerPublicKeyEvent.PublicKey, "Unexpected public key on register public key event")
 
 	integration.CreateBlocks(client, 20, genesisKey)
 
@@ -159,7 +165,7 @@ func TestPob(t *testing.T) {
 	tx, err = integration.CreateTransaction(client, []*protocol.Operation{enablePoB}, genesisKey)
 	integration.NoError(t, err)
 
-	receipt, err = integration.CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
+	_, err = integration.CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
 	integration.NoError(t, err)
 
 	headInfo, err := integration.GetHeadInfo(client)
