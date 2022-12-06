@@ -669,7 +669,7 @@ func KeyFromWIF(wif string) (*util.KoinosKey, error) {
 		return nil, err
 	}
 
-	key, err := util.NewKoinosKeysFromBytes(bytes)
+	key, err := util.NewKoinosKeyFromBytes(bytes)
 	if err != nil {
 		return nil, err
 	}
