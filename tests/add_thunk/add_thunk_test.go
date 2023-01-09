@@ -29,6 +29,9 @@ func TestAddThunk(t *testing.T) {
 
 	integration.AwaitChain(t, client)
 
+	maxRc, err := integration.GetAccountRc(client, genesisKey.AddressBytes())
+	integration.NoError(t, err)
+
 	t.Logf("Uploading call_nop contract")
 	err = integration.UploadContract(client, "../../contracts/call_nop.wasm", callNopKey)
 	integration.NoError(t, err)
@@ -93,7 +96,12 @@ func TestAddThunk(t *testing.T) {
 		},
 	}
 
-	tx, err = integration.CreateTransaction(client, []*protocol.Operation{setSystemContract, callAddThunk, overrideNop}, genesisKey)
+	modRcLimit := func(t *protocol.Transaction) error {
+		t.Header.RcLimit = maxRc / 4
+		return nil
+	}
+
+	tx, err = integration.CreateTransaction(client, []*protocol.Operation{setSystemContract, callAddThunk, overrideNop}, genesisKey, modRcLimit)
 	integration.NoError(t, err)
 
 	_, err = integration.SubmitTransaction(client, tx)
@@ -104,7 +112,7 @@ func TestAddThunk(t *testing.T) {
 
 	t.Logf("Calling call_nop again")
 
-	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey)
+	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callContract}, genesisKey, modRcLimit)
 	integration.NoError(t, err)
 
 	_, err = integration.SubmitTransaction(client, tx)
@@ -112,7 +120,7 @@ func TestAddThunk(t *testing.T) {
 
 	t.Logf("Check error when running add_thunk again")
 
-	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callAddThunk}, genesisKey)
+	tx, err = integration.CreateTransaction(client, []*protocol.Operation{callAddThunk}, genesisKey, modRcLimit)
 	integration.NoError(t, err)
 
 	_, err = integration.SubmitTransaction(client, tx)
