@@ -43,4 +43,4 @@ services:
          - config_volume:/root/.koinos
       depends_on:
          - node_config
-      command: -a amqp://guest:guest@amqp:5672/ --algorithm=pob --gossip-production=false --private-key-file=pob.key --pob-contract-id=17j7nkWm3HU6J4BaKsquiEZ19YRXUxwQJq --vhp-contract-id=1CZvRyRuNxghMUUNGqsKsT5x55r6wugd1C --producer=18pztbh788JozD6UVuT67W5sNpYNgFk7Q2
+      command: -a amqp://guest:guest@amqp:5672/ --algorithm=pob --gossip-production=false --private-key-file=pob.key --producer=18pztbh788JozD6UVuT67W5sNpYNgFk7Q2
