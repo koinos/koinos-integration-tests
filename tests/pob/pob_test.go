@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"koinos-integration-tests/integration"
+	"koinos-integration-tests/integration/name_service"
 	"koinos-integration-tests/integration/token"
 	"testing"
 	"time"
@@ -58,6 +59,14 @@ func TestPob(t *testing.T) {
 
 	t.Logf("Uploading PoB contract")
 	_, err = integration.UploadSystemContract(client, "../../contracts/pob.wasm", pobKey, "pob")
+	integration.NoError(t, err)
+
+	nameService := name_service.GetNameService(client)
+
+	_, err = nameService.SetRecord(t, genesisKey, "vhp", vhpKey.AddressBytes())
+	integration.NoError(t, err)
+
+	_, err = nameService.SetRecord(t, genesisKey, "pob", pobKey.AddressBytes())
 	integration.NoError(t, err)
 
 	t.Logf("Minting KOIN")
