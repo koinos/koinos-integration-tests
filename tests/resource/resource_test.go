@@ -13,6 +13,7 @@ import (
 	token_proto "github.com/koinos/koinos-proto-golang/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/koinos/protocol"
 	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
 	util "github.com/koinos/koinos-util-golang"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
@@ -48,7 +49,7 @@ func getMarkets(client integration.Client, resourceAddress []byte) (*resources.R
 }
 
 func TestResource(t *testing.T) {
-	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:5672/")
+	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
