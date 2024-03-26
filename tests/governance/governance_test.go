@@ -7,11 +7,11 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/koinos/koinos-proto-golang/koinos/chain"
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/chain"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/governance"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )

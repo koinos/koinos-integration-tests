@@ -8,9 +8,9 @@ import (
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/claim"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"github.com/mr-tron/base58"
 	"google.golang.org/protobuf/proto"
 )

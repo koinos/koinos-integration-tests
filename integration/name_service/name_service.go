@@ -4,9 +4,9 @@ import (
 	"koinos-integration-tests/integration"
 	"testing"
 
-	name_service "github.com/koinos/koinos-proto-golang/koinos/contracts/name-service"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
+	name_service "github.com/koinos/koinos-proto-golang/v2/koinos/contracts/name-service"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"google.golang.org/protobuf/proto"
 )
 

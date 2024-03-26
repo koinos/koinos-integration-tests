@@ -16,19 +16,19 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/base58"
 	koinosmq "github.com/koinos/koinos-mq-golang"
-	"github.com/koinos/koinos-proto-golang/koinos/canonical"
-	"github.com/koinos/koinos-proto-golang/koinos/chain"
-	name_service "github.com/koinos/koinos-proto-golang/koinos/contracts/name-service"
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
-	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
-	cmsrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/contract_meta_store"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/mempool"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/p2p"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/transaction_store"
-	util "github.com/koinos/koinos-util-golang"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/canonical"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/chain"
+	name_service "github.com/koinos/koinos-proto-golang/v2/koinos/contracts/name-service"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/token"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/block_store"
+	chainrpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/chain"
+	cmsrpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/contract_meta_store"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/mempool"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/p2p"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/transaction_store"
+	util "github.com/koinos/koinos-util-golang/v2"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/multiformats/go-multihash"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/encoding/protojson"
@@ -233,7 +233,7 @@ type MQClient struct {
 
 func NewKoinosMQClient(url string) *MQClient {
 	c := koinosmq.NewClient(url, koinosmq.NoRetry)
-	c.Start()
+	c.Start(context.Background())
 	return &MQClient{
 		client: c,
 	}
@@ -324,7 +324,7 @@ func (mq *MQClient) Call(ctx context.Context, method string, params proto.Messag
 		return err
 	}
 
-	resBytes, err := mq.client.RPCContext(ctx, "application/octet-stream", s[0], reqBytes)
+	resBytes, err := mq.client.RPC(ctx, "application/octet-stream", s[0], reqBytes)
 	if err != nil {
 		return err
 	}
@@ -361,8 +361,9 @@ func (e eventList) Swap(i, j int) {
 
 // CreateBlock creates a block from a list of transactions
 // Variadic arguments can be the following:
-//    key *util.KoinosKey - Key to produce the block with
-//    mod func(b *protocol.Block) error - Modification callback function
+//
+//	key *util.KoinosKey - Key to produce the block with
+//	mod func(b *protocol.Block) error - Modification callback function
 func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...interface{}) (*protocol.BlockReceipt, error) {
 	var key *util.KoinosKey
 	var mod func(b *protocol.Block) error
@@ -487,8 +488,9 @@ func CreateBlock(client Client, transactions []*protocol.Transaction, vars ...in
 
 // CreateBlocks creates 'n' empty blocks
 // Variadic arguments can be the following:
-//    key *util.KoinosKey - Key to produce the block with
-//    mod func(b *protocol.Block) error - Modification callback function, called on each block
+//
+//	key *util.KoinosKey - Key to produce the block with
+//	mod func(b *protocol.Block) error - Modification callback function, called on each block
 func CreateBlocks(client Client, n int, vars ...interface{}) ([]*protocol.BlockReceipt, error) {
 	receipts := make([]*protocol.BlockReceipt, 0)
 
@@ -506,8 +508,9 @@ func CreateBlocks(client Client, n int, vars ...interface{}) ([]*protocol.BlockR
 
 // CreateTransaction creates a transaction from a list of operations
 // Variadic arguments can be the following:
-//    mod func(b *protocol.Block) error - Modification callback function, called on each block
-//    *util.KoinosKey - Key to sign the transaction with, the first key is used to retreive the nonce
+//
+//	mod func(b *protocol.Block) error - Modification callback function, called on each block
+//	*util.KoinosKey - Key to sign the transaction with, the first key is used to retreive the nonce
 func CreateTransaction(client Client, ops []*protocol.Operation, vars ...interface{}) (*protocol.Transaction, error) {
 	var mod func(b *protocol.Transaction) error = nil
 	keys := make([]*util.KoinosKey, 0)

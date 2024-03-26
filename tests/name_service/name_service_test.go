@@ -6,8 +6,8 @@ import (
 
 	nameUtil "koinos-integration-tests/integration/name_service"
 
-	"github.com/koinos/koinos-proto-golang/koinos/chain"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/chain"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/stretchr/testify/require"
 )
 

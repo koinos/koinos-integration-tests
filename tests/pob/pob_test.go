@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/koinos/koinos-proto-golang/koinos/chain"
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/pob"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/chain"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/pob"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/block_store"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )

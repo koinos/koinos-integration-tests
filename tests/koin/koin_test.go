@@ -6,7 +6,7 @@ import (
 	"math"
 	"testing"
 
-	util "github.com/koinos/koinos-util-golang"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"github.com/stretchr/testify/require"
 )
 
