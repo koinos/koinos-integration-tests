@@ -1,50 +1,50 @@
-volumes:
-  config_volume:
-
 services:
-   amqp:
-      image: rabbitmq:alpine
+  amqp:
+    image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
 
-   node_config:
-    build:
-      context: ../../node_config
-    volumes:
-      -  config_volume:/koinos
+  chain:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+    depends_on:
+      - amqp
+    configs:
+      - source: genesis-data
+        target: /koinos/chain/genesis_data.json
+    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/
 
-   jsonrpc:
-      image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
-      ports:
-         - "8080:8080"
-      volumes:
-         - config_volume:/root/.koinos
-      depends_on:
-         - node_config
-      command: -a amqp://guest:guest@amqp:5672/ -L /tcp/8080 --log-level debug
+  mempool:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    command: -a amqp://guest:guest@amqp:5672/
 
-   mempool:
-      image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
-      command: -a amqp://guest:guest@amqp:5672/
+  block_store:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    command: -a amqp://guest:guest@amqp:5672/
 
-   block_store:
-      image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
-      command: -a amqp://guest:guest@amqp:5672/
+  jsonrpc:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    configs:
+      - source: koinos-descriptors
+        target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    ports:
+      - "8080:8080"
+    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/ -L /tcp/8080
 
-   chain:
-      image: koinos/koinos-chain:${CHAIN_TAG:-latest}
-      volumes:
-         - config_volume:/root/.koinos
-      depends_on:
-         - node_config
-      command: -a amqp://guest:guest@amqp:5672/
-
-   p2p:
-      image: koinos/koinos-p2p:${P2P_TAG:-latest}
-      command: -a amqp://guest:guest@amqp:5672/ -s bucket_brigade
-
-   block_producer:
-      image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
-      volumes:
-         - config_volume:/root/.koinos
-      depends_on:
-         - node_config
-      command: -a amqp://guest:guest@amqp:5672/ --algorithm=federated --gossip-production=false
+  block_producer:
+    image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    configs:
+      - source: pob-private-key
+        target: /root/.koinos/block_producer/private.key
+    command: -a amqp://guest:guest@amqp:5672/ --algorithm=federated --gossip-production=false

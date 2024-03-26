@@ -6,22 +6,26 @@ function run_test() {
    local code=0
 
    pushd $1
+
+   TEST_NAME=`basename \`pwd\``
+   COMPOSE_COMMAND="docker-compose -p $TEST_NAME -f ../../node_config/docker-compose.config.yml -f docker-compose.yml"
+
    go build ./...
    if [ $? -ne 0 ];
    then
-      echo "Failed to build integration test: ${1}"
+      echo "Failed to build integration test: $TEST_NAME"
       code=1
       popd
       continue
    fi
 
-   docker-compose up -d
+   $COMPOSE_COMMAND up -d
    if [ $? -ne 0 ];
    then
-      echo "Failed to start cluster: ${1}"
+      echo "Failed to start cluster: $TEST_NAME"
       code=1
-      docker-compose logs
-      docker-compose down
+      $COMPOSE_COMMAND logs
+      $COMPOSE_COMMAND down
       popd
       continue
    fi
@@ -30,12 +34,12 @@ function run_test() {
    go test -timeout 30m -v ./...
    if [ $? -ne 0 ];
    then
-      echo "Failed during integration test: ${1}"
-      docker-compose logs
+      echo "Failed during integration test: $TEST_NAME"
+      $COMPOSE_COMMAND logs
       code=1
    fi
 
-   docker-compose down -v
+   $COMPOSE_COMMAND down -v
    popd
 
    return $code

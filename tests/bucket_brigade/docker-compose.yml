@@ -8,11 +8,6 @@ networks:
   bucket2:
     name: bucket2
 
-volumes:
-  producer_volume:
-  bucket1_volume:
-  bucket2_volume:
-
 services:
   #producer
   amqp_producer:
@@ -20,70 +15,69 @@ services:
     networks:
       - producer
 
-  producer_config:
-    build:
-      context: ../../node_config
-    volumes:
-      - producer_volume:/koinos
-
-  jsonrpc_producer:
-    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
-    networks:
-      - producer
-    ports:
-      - "8080:8080"
-    volumes:
-         - producer_volume:/root/.koinos
+  chain_producer:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     depends_on:
       - amqp_producer
-      - producer_config
-    command: -a amqp://guest:guest@amqp_producer:5672/ -L /ip4/0.0.0.0/tcp/8080
+    networks:
+      - producer
+    configs:
+      - source: genesis-data
+        target: /root/.koinos/chain/genesis_data.json
+    command: -a amqp://guest:guest@amqp_producer:5672/
 
   mempool_producer:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
-    networks:
-      - producer
     depends_on:
       - amqp_producer
+      - chain_producer
+    networks:
+      - producer
     command: -a amqp://guest:guest@amqp_producer:5672/
 
   block_store_producer:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
-    networks:
-      - producer
     depends_on:
       - amqp_producer
-    command: -a amqp://guest:guest@amqp_producer:5672/
-
-  chain_producer:
-    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+      - chain_producer
     networks:
       - producer
-    volumes:
-      - producer_volume:/root/.koinos
-    depends_on:
-      - amqp_producer
-      - producer_config
     command: -a amqp://guest:guest@amqp_producer:5672/
 
   p2p_producer:
     image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
     networks:
       - p2p
       - producer
+    command: -a amqp://guest:guest@amqp_producer:5672/ --disable-gossip -s producer -L /ip4/0.0.0.0/tcp/8888
+
+  jsonrpc_producer:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
     depends_on:
       - amqp_producer
-    command: -a amqp://guest:guest@amqp_producer:5672/ --disable-gossip -s producer -L /ip4/0.0.0.0/tcp/8888
+      - chain_producer
+    networks:
+      - producer
+    ports:
+      - "8080:8080"
+    configs:
+      - source: koinos-descriptors
+        target: /root/.koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    command: -a amqp://guest:guest@amqp_producer:5672/ -L /ip4/0.0.0.0/tcp/8080
 
   block_producer:
     image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
-    networks:
-      - producer
-    volumes:
-      - producer_volume:/root/.koinos
     depends_on:
       - amqp_producer
-      - producer_config
+      - chain_producer
+    networks:
+      - producer
+    configs:
+      - source: pob-private-key
+        target: /root/.koinos/block_producer/private.key
     command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --gossip-production=false
 
   #bucket1
@@ -92,47 +86,43 @@ services:
     networks:
       - bucket1
 
-  bucket1_config:
-    build:
-      context: ../../node_config
-    volumes:
-      - bucket1_volume:/koinos
+  chain_bucket1:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+    depends_on:
+      - amqp_bucket1
+    networks:
+      - bucket1
+    configs:
+         - source: genesis-data
+           target: /root/.koinos/chain/genesis_data.json
+    command: -a amqp://guest:guest@amqp_bucket1:5672/
 
   mempool_bucket1:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
-    networks:
-      - bucket1
     depends_on:
       - amqp_bucket1
+      - chain_bucket1
+    networks:
+      - bucket1
     command: -a amqp://guest:guest@amqp_bucket1:5672/
 
   block_store_bucket1:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
-    networks:
-      - bucket1
     depends_on:
       - amqp_bucket1
-    command: -a amqp://guest:guest@amqp_bucket1:5672/
-
-  chain_bucket1:
-    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+      - chain_bucket1
     networks:
       - bucket1
-    volumes:
-      - bucket1_volume:/root/.koinos
-    depends_on:
-      - amqp_bucket1
-      - bucket1_config
     command: -a amqp://guest:guest@amqp_bucket1:5672/
 
   p2p_bucket1:
     image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp_bucket1
+      - chain_bucket1
     networks:
       - p2p
       - bucket1
-    depends_on:
-      - amqp_bucket1
-      - p2p_producer
     command: -a amqp://guest:guest@amqp_bucket1:5672/ --disable-gossip -s bucket1 -L /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_producer/tcp/8888/p2p/QmRT2UJ9uPqmcjCWoxgFZU3AsaMaMqmJ3DaEHeWZFLJp9L
 
   #bucket2
@@ -141,58 +131,55 @@ services:
     networks:
       - bucket2
 
-  bucket2_config:
-    build:
-      context: ../../node_config
-    volumes:
-      - bucket2_volume:/koinos
-
-  jsonrpc_bucket2:
-    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
-    networks:
-      - bucket2
-    ports:
-      - "8082:8080"
-    volumes:
-      - bucket2_volume:/root/.koinos
+  chain_bucket2:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     depends_on:
       - amqp_bucket2
-      - bucket2_config
-    command: -a amqp://guest:guest@amqp_bucket2:5672/ -L /tcp/8080
+    networks:
+      - bucket2
+    configs:
+      - source: genesis-data
+        target: /root/.koinos/chain/genesis_data.json
+    command: -a amqp://guest:guest@amqp_bucket2:5672/
 
   mempool_bucket2:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
-    networks:
-      - bucket2
     depends_on:
       - amqp_bucket2
+      - chain_bucket2
+    networks:
+      - bucket2
     command: -a amqp://guest:guest@amqp_bucket2:5672/
 
   block_store_bucket2:
     image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
-    networks:
-      - bucket2
     depends_on:
       - amqp_bucket2
-    command: -a amqp://guest:guest@amqp_bucket2:5672/
-
-  chain_bucket2:
-    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+      - chain_bucket2
     networks:
       - bucket2
-    volumes:
-      - bucket2_volume:/root/.koinos
-    depends_on:
-      - amqp_bucket2
-      - bucket2_config
     command: -a amqp://guest:guest@amqp_bucket2:5672/
 
   p2p_bucket2:
     image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp_bucket2
+      - chain_bucket2
     networks:
       - p2p
       - bucket2
+    command: -a amqp://guest:guest@amqp_bucket2:5672/ --disable-gossip -s bucket2 -L /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_bucket1/tcp/8888/p2p/QmcWYgujghF1oJhisxSTGYNjzPGVtejEL8XU41AqmEJsRB
+
+  jsonrpc_bucket2:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
     depends_on:
       - amqp_bucket2
-      - p2p_bucket1
-    command: -a amqp://guest:guest@amqp_bucket2:5672/ --disable-gossip -s bucket2 -L /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_bucket1/tcp/8888/p2p/QmcWYgujghF1oJhisxSTGYNjzPGVtejEL8XU41AqmEJsRB
+      - chain_bucket2
+    networks:
+      - bucket2
+    ports:
+      - "8082:8080"
+    configs:
+      - source: koinos-descriptors
+        target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    command: --basedir=/koinos -a amqp://guest:guest@amqp_bucket2:5672/ -L /tcp/8080

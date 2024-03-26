@@ -1,0 +1,12 @@
+configs:
+   genesis-data:
+      file: ./genesis_data.json
+
+   koinos-descriptors:
+      file: ./koinos_descriptors.pb
+
+   pob-public-key:
+      file: ./pob.key
+
+   pob-private-key:
+      file: ./private.key
