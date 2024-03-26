@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"koinos-integration-tests/integration"
 
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/token"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/token"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"google.golang.org/protobuf/proto"
 )
 

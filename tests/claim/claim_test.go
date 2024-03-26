@@ -5,10 +5,10 @@ import (
 	claimUtil "koinos-integration-tests/integration/claim"
 	"koinos-integration-tests/integration/token"
 
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/claim"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/claim"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/stretchr/testify/require"
 
 	"koinos-integration-tests/integration"

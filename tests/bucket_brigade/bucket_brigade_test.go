@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	kjson "github.com/koinos/koinos-proto-golang/encoding/json"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/block_store"
-	"github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
+	kjson "github.com/koinos/koinos-proto-golang/v2/encoding/json"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/block_store"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/chain"
 	jsonrpc "github.com/ybbus/jsonrpc/v3"
 )
 

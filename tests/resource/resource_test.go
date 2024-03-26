@@ -8,12 +8,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/koinos/koinos-proto-golang/koinos/chain"
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/resources"
-	token_proto "github.com/koinos/koinos-proto-golang/koinos/contracts/token"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	chainrpc "github.com/koinos/koinos-proto-golang/koinos/rpc/chain"
-	util "github.com/koinos/koinos-util-golang"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/chain"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/resources"
+	token_proto "github.com/koinos/koinos-proto-golang/v2/koinos/contracts/token"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	chainrpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/chain"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 )

@@ -6,8 +6,8 @@ import (
 	"math"
 	"testing"
 
-	util "github.com/koinos/koinos-util-golang"
-	kjsonrpc "github.com/koinos/koinos-util-golang/rpc"
+	util "github.com/koinos/koinos-util-golang/v2"
+	kjsonrpc "github.com/koinos/koinos-util-golang/v2/rpc"
 	"github.com/stretchr/testify/require"
 )
 

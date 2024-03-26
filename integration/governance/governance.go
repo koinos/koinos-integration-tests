@@ -5,9 +5,9 @@ import (
 	"koinos-integration-tests/integration"
 	"testing"
 
-	"github.com/koinos/koinos-proto-golang/koinos/contracts/governance"
-	"github.com/koinos/koinos-proto-golang/koinos/protocol"
-	util "github.com/koinos/koinos-util-golang"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/governance"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	util "github.com/koinos/koinos-util-golang/v2"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -89,8 +89,9 @@ func (g *Governance) GetProposalById(id []byte) (*governance.ProposalRecord, err
 
 // GetProposals
 // Variadic arguments can be:
-//    start []byte - proposal id to start at
-//    limit uint64 - limit of proposals to return at once
+//
+//	start []byte - proposal id to start at
+//	limit uint64 - limit of proposals to return at once
 func (g *Governance) GetProposals(vars ...interface{}) ([]*governance.ProposalRecord, error) {
 	var start []byte = make([]byte, 0)
 	var limit uint64 = 0
@@ -134,8 +135,9 @@ func (g *Governance) GetProposals(vars ...interface{}) ([]*governance.ProposalRe
 
 // GetProposalsByStatus
 // Variadic arguments can be:
-//    start []byte - proposal id to start at
-//    limit uint64 - limit of proposals to return at once
+//
+//	start []byte - proposal id to start at
+//	limit uint64 - limit of proposals to return at once
 func (g *Governance) GetProposalsByStatus(status governance.ProposalStatus, vars ...interface{}) ([]*governance.ProposalRecord, error) {
 	var start []byte = make([]byte, 0)
 	var limit uint64 = 0
