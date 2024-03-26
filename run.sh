@@ -1,5 +1,7 @@
 #!/bin/bash
 
+export JSONRPC_TAG=proto-v2
+
 function run_test() {
    local code=0
 
