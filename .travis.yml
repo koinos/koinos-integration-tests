@@ -26,8 +26,6 @@ install:
   - go get ./...
 
 before_script:
-  - sudo usermod -aG docker $USER
-  - sudo systemctl start docker.service && sudo systemctl start docker.socket
   - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
 
 script:
