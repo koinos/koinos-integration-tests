@@ -3,19 +3,26 @@ language: go
 go:
   - 1.x
 
-services:
-  - docker
-
 jobs:
   include:
     - os: linux
       dist: focal
 
+before_install:
+  - sudo apt-get update
+  - sudo apt-get install ca-certificates curl
+  - sudo install -m 0755 -d /etc/apt/keyrings
+  - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+  - sudo chmod a+r /etc/apt/keyrings/docker.asc
+  - |
+    echo \
+      "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
+      $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+      sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+  - sudo apt-get update
+
 install:
-  - for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc docker; do sudo apt-get remove $pkg; done
-  - curl "https://get.docker.com/" -o install_docker.sh
-  - chmod +x install_docker.sh
-  - sudo ./install_docker.sh --version 25
+  - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - go get ./...
 
 before_script:
