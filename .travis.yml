@@ -3,6 +3,9 @@ language: go
 go:
   - 1.x
 
+services:
+  - docker
+
 jobs:
   include:
     - os: linux
