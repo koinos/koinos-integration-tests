@@ -9,7 +9,7 @@ jobs:
       dist: focal
 
 install:
-  - for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+  - for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc docker; do sudo apt-get remove $pkg; done
   - curl "https://get.docker.com/" -o install_docker.sh
   - chmod +x install_docker.sh
   - sudo ./install_docker.sh --version 25
