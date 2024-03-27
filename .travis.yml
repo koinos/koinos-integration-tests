@@ -6,10 +6,10 @@ go:
 jobs:
   include:
     - os: linux
-      dist: focal
+      dist: jammy
 
 before_install:
-  - sudo apt-get update
+  - sudo systemctl stop docker.service && sudo systemctl stop docker.socket
   - sudo apt-get install ca-certificates curl
   - sudo install -m 0755 -d /etc/apt/keyrings
   - sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
@@ -26,6 +26,8 @@ install:
   - go get ./...
 
 before_script:
+  - sudo usermod -aG docker $USER
+  - sudo systemctl start docker.service && sudo systemctl start docker.docker
   - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
 
 script:
