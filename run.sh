@@ -8,7 +8,7 @@ function run_test() {
    pushd $1
 
    TEST_NAME=`basename \`pwd\``
-   COMPOSE_COMMAND="docker-compose -p $TEST_NAME -f ../../node_config/docker-compose.config.yml -f docker-compose.yml"
+   COMPOSE_COMMAND="docker compose -p $TEST_NAME -f ../../node_config/docker-compose.config.yml -f docker-compose.yml"
 
    go build ./...
    if [ $? -ne 0 ];

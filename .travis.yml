@@ -9,7 +9,12 @@ jobs:
       dist: focal
 
 install:
-  - ci/install.sh
+  - for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+  - wget -qO- https://get.docker.com/ | sh --version 25
+  - go get ./...
+
+before_script:
+  - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
 
 script:
-  - ci/test.sh
+  - ./run.sh
