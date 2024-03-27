@@ -10,7 +10,9 @@ jobs:
 
 install:
   - for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
-  - wget -qO- https://get.docker.com/ | sh --version 25
+  - curl "https://get.docker.com/" -o install_docker.sh
+  - chmod +x install_docker.sh
+  - sudo ./install_docker.sh --version 25
   - go get ./...
 
 before_script:
