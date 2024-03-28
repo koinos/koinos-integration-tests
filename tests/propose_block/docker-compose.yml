@@ -4,6 +4,13 @@ services:
     ports:
       - "5672:5672"
 
+  p2p:
+    image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    command: -a amqp://guest:guest@amqp:5672/
+
   chain:
     image: koinos/koinos-chain:${CHAIN_TAG:-latest}
     depends_on:
@@ -42,10 +49,10 @@ services:
   block_producer:
     image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
     depends_on:
+      - amqp
       - chain
+      - p2p
     configs:
-      - source: pob-public-key
-        target: /koinos/block_producer/pob.key
       - source: pob-private-key
         target: /koinos/block_producer/private.key
-    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/ --algorithm=pob --gossip-production=false --private-key-file=pob.key --producer=18pztbh788JozD6UVuT67W5sNpYNgFk7Q2
+    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/ --algorithm=federated
