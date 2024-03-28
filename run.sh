@@ -14,7 +14,7 @@ function run_test() {
       echo "Failed to build integration test: $TEST_NAME"
       code=1
       popd
-      continue
+      return $code
    fi
 
    $COMPOSE_COMMAND up -d
@@ -25,7 +25,7 @@ function run_test() {
       $COMPOSE_COMMAND logs
       $COMPOSE_COMMAND down
       popd
-      continue
+      return $code
    fi
 
    go clean -testcache
