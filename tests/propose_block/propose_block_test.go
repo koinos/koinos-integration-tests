@@ -74,9 +74,6 @@ func TestProposeBlock(t *testing.T) {
 	koinKey, err := integration.GetKey(integration.Koin)
 	integration.NoError(t, err)
 
-	// producerKey, err := integration.GetKey(integration.PobProducer)
-	// integration.NoError(t, err)
-
 	t.Logf("Generating key for alice")
 	aliceKey, err := util.GenerateKoinosKey()
 	integration.NoError(t, err)
