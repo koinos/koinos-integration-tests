@@ -1,0 +1,40 @@
+services:
+  amqp:
+    image: rabbitmq:alpine
+    ports:
+      - "5672:5672"
+
+  chain:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+    depends_on:
+      - amqp
+    configs:
+      - source: genesis-data
+        target: /koinos/chain/genesis_data.json
+    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/
+
+  mempool:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    command: -a amqp://guest:guest@amqp:5672/
+
+  block_store:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    command: -a amqp://guest:guest@amqp:5672/
+
+  jsonrpc:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
+    depends_on:
+      - amqp
+      - chain
+    configs:
+      - source: koinos-descriptors
+        target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    ports:
+      - "8080:8080"
+    command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/ -L /tcp/8080
