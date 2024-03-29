@@ -5,6 +5,7 @@ import (
 	"koinos-integration-tests/integration"
 	xtoken "koinos-integration-tests/integration/token"
 	"testing"
+	"time"
 
 	mq "github.com/koinos/koinos-mq-golang"
 	broadcast "github.com/koinos/koinos-proto-golang/v2/koinos/broadcast"
@@ -67,6 +68,12 @@ func transferTransaction(client integration.Client, from *util.KoinosKey, to []b
 }
 
 func TestProposeBlock(t *testing.T) {
+	panicTime := time.NewTimer(time.Minute)
+	go func() {
+		<-panicTime.C
+		panic("Timer expired")
+	}()
+
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
 	mqClient := mq.NewClient("amqp://guest:guest@localhost:5672/", mq.NoRetry)
 	mqClient.Start(context.Background())
@@ -156,6 +163,8 @@ func TestProposeBlock(t *testing.T) {
 			t.Logf("Mempool contains 100 pending transactions")
 			break
 		}
+
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	broadcastGossipStatus(t, mqClient, true)
@@ -180,6 +189,8 @@ func TestProposeBlock(t *testing.T) {
 		if block != nil {
 			break
 		}
+
+		time.Sleep(time.Millisecond * 100)
 	}
 
 	t.Logf("Ensure subsequent block with height %d contains %d transactions", block.Header.Height, numTransactions/2)
