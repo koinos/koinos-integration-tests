@@ -22,6 +22,7 @@ import (
 	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
 	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/block_store"
+	block_store_rpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/block_store"
 	chainrpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/chain"
 	cmsrpc "github.com/koinos/koinos-proto-golang/v2/koinos/rpc/contract_meta_store"
 	"github.com/koinos/koinos-proto-golang/v2/koinos/rpc/mempool"
@@ -76,6 +77,7 @@ const (
 	GetHeadInfoCall            = "chain.get_head_info"
 	SubmitBlockCall            = "chain.submit_block"
 	GetPendingTransactionsCall = "mempool.get_pending_transactions"
+	GetBlocksByHeightCall      = "block_store.get_blocks_by_height"
 
 	defaultTimeout = time.Second
 )
@@ -117,6 +119,29 @@ func GetHeadInfo(client Client) (*chainrpc.GetHeadInfoResponse, error) {
 	}
 
 	return headInfo, nil
+}
+
+// GetBlocksByHeight gets blocks for the given height
+func GetBlocksByHeight(client Client, headBlockId []byte, ancestorStartHeight uint64, numBlocks uint32, returnBlock bool, returnReceipt bool) (*block_store_rpc.GetBlocksByHeightResponse, error) {
+	params := block_store_rpc.GetBlocksByHeightRequest{
+		HeadBlockId:         headBlockId,
+		AncestorStartHeight: ancestorStartHeight,
+		NumBlocks:           numBlocks,
+		ReturnBlock:         returnBlock,
+		ReturnReceipt:       returnReceipt,
+	}
+
+	blocksByHeight := &block_store_rpc.GetBlocksByHeightResponse{}
+
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	err := client.Call(ctx, GetBlocksByHeightCall, &params, blocksByHeight)
+	if err != nil {
+		return nil, err
+	}
+
+	return blocksByHeight, nil
 }
 
 // GetPendingTransactions gets the pending transactions from the mempool
