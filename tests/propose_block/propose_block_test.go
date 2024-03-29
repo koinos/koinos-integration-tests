@@ -68,7 +68,7 @@ func transferTransaction(client integration.Client, from *util.KoinosKey, to []b
 }
 
 func TestProposeBlock(t *testing.T) {
-	panicTime := time.NewTimer(3 * time.Minute)
+	panicTime := time.NewTimer(time.Minute)
 	go func() {
 		<-panicTime.C
 		panic("Timer expired")
