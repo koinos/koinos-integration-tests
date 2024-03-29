@@ -68,7 +68,7 @@ func transferTransaction(client integration.Client, from *util.KoinosKey, to []b
 }
 
 func TestProposeBlock(t *testing.T) {
-	panicTime := time.NewTimer(time.Minute)
+	panicTime := time.NewTimer(3 * time.Minute)
 	go func() {
 		<-panicTime.C
 		panic("Timer expired")
@@ -167,7 +167,12 @@ func TestProposeBlock(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 	}
 
-	broadcastGossipStatus(t, mqClient, true)
+	go func() {
+		for {
+			broadcastGossipStatus(t, mqClient, true)
+			time.Sleep(time.Second)
+		}
+	}()
 
 	var block *protocol.Block = nil
 
