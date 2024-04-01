@@ -21,7 +21,7 @@ func broadcastGossipStatus(t *testing.T, c *mq.Client, flag bool) {
 	gossipStatusBytes, err := proto.Marshal(&broadcast.GossipStatus{Enabled: flag})
 	integration.NoError(t, err)
 
-	c.Broadcast(context.Background(), "application/octet-stream", "koinos.gossip.status", gossipStatusBytes)
+	c.Broadcast(context.Background(), mq.OctetStream, "koinos.gossip.status", gossipStatusBytes)
 }
 
 func broadcastTransactionAccepted(t *testing.T, c *mq.Client, height uint64, transaction *protocol.Transaction) {
@@ -29,7 +29,7 @@ func broadcastTransactionAccepted(t *testing.T, c *mq.Client, height uint64, tra
 	transactionedAcceptedBytes, err := proto.Marshal(&broadcast.TransactionAccepted{Transaction: transaction, Receipt: &bogusReceipt, Height: height})
 	integration.NoError(t, err)
 
-	c.Broadcast(context.Background(), "application/octet-stream", "koinos.transaction.accept", transactionedAcceptedBytes)
+	c.Broadcast(context.Background(), mq.OctetStream, "koinos.transaction.accept", transactionedAcceptedBytes)
 }
 
 func transferTransaction(client integration.Client, from *util.KoinosKey, to []byte, value uint64, mod func(*protocol.Transaction) error) (*protocol.Transaction, error) {

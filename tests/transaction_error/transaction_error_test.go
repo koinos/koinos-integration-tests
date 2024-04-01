@@ -1,4 +1,4 @@
-package transactionError
+package transaction_error
 
 import (
 	"context"
@@ -73,6 +73,7 @@ func TestTransactionError(t *testing.T) {
 		Request: &chainrpc.ChainRequest_SubmitTransaction{
 			SubmitTransaction: &chainrpc.SubmitTransactionRequest{
 				Transaction: badNonceTransaction,
+				Broadcast:   true,
 			},
 		},
 	})
@@ -100,7 +101,7 @@ func TestTransactionError(t *testing.T) {
 			}
 		}
 		if !success {
-			t.Errorf("Expected chain ErrorDetails containing invalid nonce error code. Was not found.")
+			t.Errorf("Expected chain ErrorDetails containing an invalid nonce error code. Was not found.")
 		}
 	default:
 		t.Errorf("Expected error response from submit_transaction")
@@ -119,6 +120,7 @@ func TestTransactionError(t *testing.T) {
 		Request: &chainrpc.ChainRequest_SubmitTransaction{
 			SubmitTransaction: &chainrpc.SubmitTransactionRequest{
 				Transaction: badRcLimitTransaction,
+				Broadcast:   true,
 			},
 		},
 	})
@@ -146,7 +148,7 @@ func TestTransactionError(t *testing.T) {
 			}
 		}
 		if !success {
-			t.Errorf("Expected chain ErrorDetails containing invalid nonce error code. Was not found.")
+			t.Errorf("Expected chain ErrorDetails containing an insufficient rc error code. Was not found.")
 		}
 	default:
 		t.Errorf("Expected error response from submit_transaction")
@@ -158,6 +160,7 @@ func TestTransactionError(t *testing.T) {
 		Request: &chainrpc.ChainRequest_SubmitTransaction{
 			SubmitTransaction: &chainrpc.SubmitTransactionRequest{
 				Transaction: badSignatureTransaction,
+				Broadcast:   true,
 			},
 		},
 	})
@@ -185,7 +188,7 @@ func TestTransactionError(t *testing.T) {
 			}
 		}
 		if !success {
-			t.Errorf("Expected chain ErrorDetails containing invalid nonce error code. Was not found.")
+			t.Errorf("Expected chain ErrorDetails containing an authorization failure error code. Was not found.")
 		}
 	default:
 		t.Errorf("Expected error response from submit_transaction")
