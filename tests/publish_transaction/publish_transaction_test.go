@@ -76,7 +76,7 @@ func TestPublishTransaction(t *testing.T) {
 		t.Error(err)
 	}
 
-	krpc := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	krpc := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
 
 	ops := make([]*protocol.Operation, 1)
 	ops[0] = &protocol.Operation{
