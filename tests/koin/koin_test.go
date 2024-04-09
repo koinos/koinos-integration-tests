@@ -11,7 +11,7 @@ import (
 )
 
 func TestKoin(t *testing.T) {
-	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:5672/")
+	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:25672/")
 
 	t.Logf("Generating key for alice")
 	aliceKey, err := util.GenerateKoinosKey()
@@ -49,9 +49,11 @@ func TestKoin(t *testing.T) {
 	integration.NoError(t, err)
 
 	balance, err := koin.Balance(aliceKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(1000), balance)
 
 	balance, err = koin.Balance(bobKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(0), balance)
 
 	supply, err = koin.TotalSupply()
@@ -64,9 +66,11 @@ func TestKoin(t *testing.T) {
 	integration.NoError(t, err)
 
 	balance, err = koin.Balance(aliceKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(1000), balance)
 
 	balance, err = koin.Balance(bobKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(0), balance)
 
 	supply, err = koin.TotalSupply()
@@ -76,15 +80,18 @@ func TestKoin(t *testing.T) {
 
 	t.Logf("Fail to burn more than balance")
 	balance, err = koin.Balance(aliceKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(1000), balance)
 
 	err = koin.Burn(aliceKey, balance+1)
 	integration.NoError(t, err)
 
 	balance, err = koin.Balance(aliceKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(1000), balance)
 
 	balance, err = koin.Balance(bobKey.AddressBytes())
+	integration.NoError(t, err)
 	require.EqualValues(t, uint64(0), balance)
 
 	supply, err = koin.TotalSupply()

@@ -17,7 +17,7 @@ import (
 )
 
 func TestPublishTransaction(t *testing.T) {
-	rpcClient := jsonrpc.NewClient("http://localhost:8080/")
+	rpcClient := jsonrpc.NewClient("http://localhost:28080/")
 
 	headInfoResponse := chain.GetHeadInfoResponse{}
 

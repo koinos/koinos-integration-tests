@@ -15,8 +15,8 @@ import (
 )
 
 func TestBucketBrigade(t *testing.T) {
-	producerClient := jsonrpc.NewClient("http://localhost:8080/")
-	endClient := jsonrpc.NewClient("http://localhost:8082/")
+	producerClient := jsonrpc.NewClient("http://localhost:28080/")
+	endClient := jsonrpc.NewClient("http://localhost:28082/")
 
 	headInfoResponse := chain.GetHeadInfoResponse{}
 

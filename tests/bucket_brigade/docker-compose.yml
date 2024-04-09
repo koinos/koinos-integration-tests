@@ -62,7 +62,7 @@ services:
     networks:
       - producer
     ports:
-      - "8080:8080"
+      - "28080:8080"
     configs:
       - source: koinos-descriptors
         target: /root/.koinos/jsonrpc/descriptors/koinos_descriptors.pb
@@ -178,7 +178,7 @@ services:
     networks:
       - bucket2
     ports:
-      - "8082:8080"
+      - "28082:8080"
     configs:
       - source: koinos-descriptors
         target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
