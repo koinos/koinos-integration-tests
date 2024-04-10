@@ -12,7 +12,7 @@ import (
 )
 
 func TestVhp(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
 
 	t.Logf("Generating key for alice")
 	aliceKey, err := util.GenerateKoinosKey()

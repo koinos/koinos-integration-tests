@@ -2,7 +2,7 @@ services:
   amqp:
     image: rabbitmq:alpine
     ports:
-      - "5672:5672"
+      - "25672:5672"
 
   chain:
     image: koinos/koinos-chain:${CHAIN_TAG:-latest}
@@ -36,7 +36,7 @@ services:
       - source: koinos-descriptors
         target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
     ports:
-      - "8080:8080"
+      - "28080:8080"
     command: --basedir=/koinos -a amqp://guest:guest@amqp:5672/ -L /tcp/8080
 
   block_producer:

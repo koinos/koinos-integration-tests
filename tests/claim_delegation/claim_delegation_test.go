@@ -38,7 +38,7 @@ const (
 )
 
 func TestClaimDelegation(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
 
 	claimKey, err := integration.GetKey(integration.Claim)
 	integration.NoError(t, err)

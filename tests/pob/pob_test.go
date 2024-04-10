@@ -25,7 +25,7 @@ const (
 )
 
 func TestPob(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
 
 	koinKey, err := integration.GetKey(integration.Koin)
 	integration.NoError(t, err)

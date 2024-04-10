@@ -12,7 +12,7 @@ import (
 )
 
 func TestAddThunk(t *testing.T) {
-	client := kjsonrpc.NewKoinosRPCClient("http://localhost:8080/")
+	client := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
