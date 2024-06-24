@@ -23,7 +23,7 @@ func TestTransactionError(t *testing.T) {
 	}()
 
 	client := kjsonrpc.NewKoinosRPCClient("http://localhost:28080/")
-	mqClient := mq.NewClient("amqp://guest:guest@localhost:25672/", mq.NoRetry)
+	mqClient := mq.NewClient("amqp://guest:guest@localhost:25673/", mq.NoRetry)
 	mqClient.Start(context.Background())
 
 	t.Logf("Generating key for alice")
