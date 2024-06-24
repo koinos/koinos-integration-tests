@@ -22,7 +22,7 @@ before_install:
   - sudo apt-get update
 
 install:
-  - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+  - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin lsof
   - sudo systemctl start docker.service && sudo systemctl start docker.socket
   - go get ./...
 
