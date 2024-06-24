@@ -48,7 +48,7 @@ func getMarkets(client integration.Client, resourceAddress []byte) (*resources.R
 }
 
 func TestResource(t *testing.T) {
-	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:25672/")
+	client := integration.NewKoinosMQClient("amqp://guest:guest@localhost:25673/")
 
 	genesisKey, err := integration.GetKey(integration.Genesis)
 	integration.NoError(t, err)
