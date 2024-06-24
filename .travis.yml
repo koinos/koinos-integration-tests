@@ -22,7 +22,7 @@ before_install:
   - sudo apt-get update
 
 install:
-  - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin lsof
+  - sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
   - sudo systemctl start docker.service && sudo systemctl start docker.socket
   - go get ./...
 
@@ -30,5 +30,5 @@ before_script:
   - echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
 
 script:
-  - lsof -i
+  - sudo lsof -i
   - ./run.sh
