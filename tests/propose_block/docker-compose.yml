@@ -2,7 +2,7 @@ services:
   amqp:
     image: rabbitmq:alpine
     ports:
-      - "25672:5672"
+      - "25673:5672"
 
   p2p:
     image: koinos/koinos-p2p:${P2P_TAG:-latest}
