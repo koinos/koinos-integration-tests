@@ -75,6 +75,7 @@ func TestResource(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	integration.InitNameService(t, client)
+	integration.InitGetContractMetadata(t, client)
 
 	t.Logf("Uploading KOIN contract")
 	_, err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")

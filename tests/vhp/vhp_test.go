@@ -30,6 +30,7 @@ func TestVhp(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	integration.InitNameService(t, client)
+	integration.InitGetContractMetadata(t, client)
 
 	t.Logf("Uploading VHP contract")
 	_, err = integration.UploadSystemContract(client, "../../contracts/vhp.wasm", vhpKey, "vhp")
