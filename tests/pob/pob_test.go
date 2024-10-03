@@ -84,6 +84,9 @@ func TestPob(t *testing.T) {
 		VhpAddress:  producerKey.AddressBytes(),
 	}
 
+	err = koin.Approve(producerKey, pobKey.AddressBytes(), burnArgs.TokenAmount)
+	integration.NoError(t, err)
+
 	args, err := proto.Marshal(burnArgs)
 	integration.NoError(t, err)
 
@@ -214,7 +217,7 @@ func TestPob(t *testing.T) {
 	headBlockNum := headInfo.HeadTopology.Height
 
 	// Set the public key again. Should trigger key delay
-	txReceipt, err := client.SubmitTransaction(context.Background(), []*protocol.Operation{registerKey}, producerKey, &kjsonrpc.SubmissionParams{Nonce: 3, RCLimit: 0}, true)
+	txReceipt, err := client.SubmitTransaction(context.Background(), []*protocol.Operation{registerKey}, producerKey, &kjsonrpc.SubmissionParams{Nonce: 4, RCLimit: 0}, true)
 	integration.NoError(t, err)
 
 	require.EqualValues(t, len(txReceipt.Events), 1, "Expected 1 events in transaction receipt")

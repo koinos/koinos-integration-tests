@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"koinos-integration-tests/integration"
 
-	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/token"
 	"github.com/koinos/koinos-proto-golang/v2/koinos/protocol"
+	"github.com/koinos/koinos-proto-golang/v2/koinos/standards/kcs4"
 	util "github.com/koinos/koinos-util-golang/v2"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,6 +16,7 @@ const (
 	totalSupplyEntry uint32 = 0xb0da3934
 	transferEntry    uint32 = 0x27f576ca
 	burnEntry        uint32 = 0x859facc5
+	approveEntry     uint32 = 0x74e21680
 )
 
 // Token interfaces with a token contract
@@ -48,7 +49,7 @@ func (t *Token) Mint(to []byte, value uint64) error {
 		return fmt.Errorf("token must know key to mint tokens")
 	}
 
-	mintArgs := &token.MintArguments{
+	mintArgs := &kcs4.MintArguments{
 		To:    to,
 		Value: value,
 	}
@@ -94,7 +95,7 @@ func (t *Token) TotalSupply() (uint64, error) {
 		return 0, err
 	}
 
-	totalSupply := &token.TotalSupplyResult{}
+	totalSupply := &kcs4.TotalSupplyResult{}
 	err = proto.Unmarshal(resp.GetResult(), totalSupply)
 	if err != nil {
 		return 0, err
@@ -105,7 +106,7 @@ func (t *Token) TotalSupply() (uint64, error) {
 
 // Transfer tokens from one address to another
 func (t *Token) Transfer(from *util.KoinosKey, to []byte, value uint64) error {
-	transferArgs := &token.TransferArguments{
+	transferArgs := &kcs4.TransferArguments{
 		From:  from.AddressBytes(),
 		To:    to,
 		Value: value,
@@ -137,7 +138,7 @@ func (t *Token) Transfer(from *util.KoinosKey, to []byte, value uint64) error {
 
 // Burn tokens from an address
 func (t *Token) Burn(from *util.KoinosKey, value uint64) error {
-	burnArgs := &token.BurnArguments{
+	burnArgs := &kcs4.BurnArguments{
 		From:  from.AddressBytes(),
 		Value: value,
 	}
@@ -158,6 +159,38 @@ func (t *Token) Burn(from *util.KoinosKey, value uint64) error {
 	}
 
 	transaction, err := integration.CreateTransaction(t.client, []*protocol.Operation{op}, from)
+	if err != nil {
+		return err
+	}
+
+	_, err = integration.CreateBlock(t.client, []*protocol.Transaction{transaction})
+	return err
+}
+
+// Approve creates an allowance for the token
+func (t *Token) Approve(owner *util.KoinosKey, to []byte, value uint64) error {
+	approveArgs := &kcs4.ApproveArguments{
+		Owner:   owner.AddressBytes(),
+		Spender: to,
+		Value:   value,
+	}
+
+	args, err := proto.Marshal(approveArgs)
+	if err != nil {
+		return err
+	}
+
+	op := &protocol.Operation{
+		Op: &protocol.Operation_CallContract{
+			CallContract: &protocol.CallContractOperation{
+				ContractId: t.contractAddress,
+				EntryPoint: approveEntry,
+				Args:       args,
+			},
+		},
+	}
+
+	transaction, err := integration.CreateTransaction(t.client, []*protocol.Operation{op}, owner)
 	if err != nil {
 		return err
 	}
