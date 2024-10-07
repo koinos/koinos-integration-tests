@@ -3,6 +3,7 @@ package governance
 import (
 	"fmt"
 	"koinos-integration-tests/integration"
+	"koinos-integration-tests/integration/token"
 	"testing"
 
 	"github.com/koinos/koinos-proto-golang/v2/koinos/contracts/governance"
@@ -33,6 +34,13 @@ func GetGovernance(client integration.Client) *Governance {
 
 // SubmitProposal to the goverance contract
 func (g *Governance) SubmitProposal(t *testing.T, payer *util.KoinosKey, mroot []byte, ops []*protocol.Operation, fee uint64) (*protocol.BlockReceipt, error) {
+	koin := token.GetKoinToken(g.client)
+
+	err := koin.Approve(payer, g.key.AddressBytes(), fee)
+	if err != nil {
+		return nil, err
+	}
+
 	submitProposalArgs := &governance.SubmitProposalArguments{
 		Operations:          ops,
 		OperationMerkleRoot: mroot,

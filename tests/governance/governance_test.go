@@ -47,6 +47,7 @@ func TestGovernance(t *testing.T) {
 	integration.AwaitChain(t, client)
 
 	integration.InitNameService(t, client)
+	integration.InitGetContractMetadata(t, client)
 
 	t.Logf("Uploading KOIN contract")
 	_, err = integration.UploadSystemContract(client, "../../contracts/koin.wasm", koinKey, "koin")
@@ -152,7 +153,7 @@ func testProposalFees(t *testing.T, client integration.Client) {
 
 	require.EqualValues(t, 1, len(receipt.TransactionReceipts), "Expected 1 transaction within the block")
 	require.EqualValues(t, 2, len(receipt.TransactionReceipts[0].Events), "Expected 2 transaction events")
-	require.EqualValues(t, "koinos.contracts.token.burn_event", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
+	require.EqualValues(t, "token.burn_event", receipt.TransactionReceipts[0].Events[0].Name, "Expected KOIN Burn event")
 }
 
 func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFactory func(t *testing.T, client integration.Client) ([]byte, []*protocol.Operation, error), proposalType int, onSuccess func(c integration.Client, t *testing.T) error) {
@@ -191,7 +192,7 @@ func testSuccessfulProposal(t *testing.T, client integration.Client, proposalFac
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
 	require.EqualValues(t, 2, len(blockEvents), "Expected 1 event within the block receipt")
-	require.EqualValues(t, "koinos.contracts.token.burn_event", blockEvents[0].Name, "Expected 'koinos.contracts.token.burn_event' event in block receipt")
+	require.EqualValues(t, "token.burn_event", blockEvents[0].Name, "Expected 'token.burn_event' event in block receipt")
 	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[1].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	t.Logf("Querying proposals")
@@ -429,7 +430,7 @@ func testFailedProposal(t *testing.T, client integration.Client, proposalFactory
 	blockEvents := integration.EventsFromBlockReceipt(receipt)
 
 	require.EqualValues(t, 2, len(blockEvents), "Expected 2 event within the block receipt")
-	require.EqualValues(t, "koinos.contracts.token.burn_event", blockEvents[0].Name, "Expected 'koinos.contracts.token.burn_event' event in block receipt")
+	require.EqualValues(t, "token.burn_event", blockEvents[0].Name, "Expected 'token.burn_event' event in block receipt")
 	require.EqualValues(t, "koinos.contracts.governance.proposal_status_event", blockEvents[1].Name, "Expected 'koinos.contracts.governance.proposal_status_event' event in block receipt")
 
 	t.Logf("Querying proposals")
