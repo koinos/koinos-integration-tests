@@ -44,32 +44,6 @@ func TestPublishTransaction(t *testing.T) {
 	_, err = client.GetAccountNonce(context.Background(), genesisKey.AddressBytes())
 	integration.NoError(t, err)
 
-	//rcLimit, err := client.GetAccountRc(context.Background(), genesisKey.AddressBytes())
-	//integration.NoError(t, err)
-
-	//rcLimit /= 20
-
-	//ops := make([]*protocol.Operation, 0)
-
-	// Nonce 1 and 2 should fail
-	/*
-		_, err = client.SubmitTransaction(context.Background(), ops, genesisKey, &kjsonrpc.SubmissionParams{Nonce: 1, RCLimit: rcLimit}, true)
-		if err == nil {
-			t.Error("nonce error expected")
-		}
-
-		nonce, _ := client.GetAccountNonce(context.Background(), genesisKey.AddressBytes())
-		fmt.Printf("%v", nonce)
-
-		_, err = client.SubmitTransaction(context.Background(), ops, genesisKey, &kjsonrpc.SubmissionParams{Nonce: 2, RCLimit: rcLimit}, true)
-		if err == nil {
-			t.Error("nonce error expected")
-		}
-
-		nonce, _ = client.GetAccountNonce(context.Background(), genesisKey.AddressBytes())
-		fmt.Printf("%v", nonce)
-	*/
-
 	// Nonce 0 and 2 should fail
 	trx, err := createTransactionWithNonce(client, genesisKey, 0)
 	integration.NoError(t, err)
