@@ -112,9 +112,95 @@ func InitGetContractMetadata(t *testing.T, client Client) {
 
 	t.Logf("Uploading get_contract_metadata contract...")
 	_, err = UploadSystemContract(client, "../../contracts/get_contract_metadata.wasm", getContractMetadataKey, "get_contract_metadata")
+	NoError(t, err)
 
 	t.Logf("Overriding get_contract_metadata")
 	err = SetSystemCallOverride(client, getContractMetadataKey, uint32(0x784faa08), uint32(chain.SystemCallId_get_contract_metadata))
+	NoError(t, err)
+}
+
+func InitResources(t *testing.T, client Client) {
+	koinKey, err := GetKey(Koin)
+	NoError(t, err)
+
+	resourcesKey, err := GetKey(Resources)
+	NoError(t, err)
+
+	genesisKey, err := GetKey(Genesis)
+	NoError(t, err)
+
+	t.Logf("Uploading resources contract...")
+	_, err = UploadSystemContract(client, "../../contracts/resources.wasm", resourcesKey, "resources")
+	NoError(t, err)
+
+	t.Logf("Overriding resource system calls...")
+	overrides := []*protocol.Operation{
+		{
+			Op: &protocol.Operation_SetSystemCall{
+				SetSystemCall: &protocol.SetSystemCallOperation{
+					CallId: uint32(chain.SystemCallId_get_account_rc),
+					Target: &protocol.SystemCallTarget{
+						Target: &protocol.SystemCallTarget_SystemCallBundle{
+							SystemCallBundle: &protocol.ContractCallBundle{
+								ContractId: koinKey.AddressBytes(),
+								EntryPoint: uint32(0x2d464aab),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Op: &protocol.Operation_SetSystemCall{
+				SetSystemCall: &protocol.SetSystemCallOperation{
+					CallId: uint32(chain.SystemCallId_consume_account_rc),
+					Target: &protocol.SystemCallTarget{
+						Target: &protocol.SystemCallTarget_SystemCallBundle{
+							SystemCallBundle: &protocol.ContractCallBundle{
+								ContractId: koinKey.AddressBytes(),
+								EntryPoint: uint32(0x80e3f5c9),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Op: &protocol.Operation_SetSystemCall{
+				SetSystemCall: &protocol.SetSystemCallOperation{
+					CallId: uint32(chain.SystemCallId_get_resource_limits),
+					Target: &protocol.SystemCallTarget{
+						Target: &protocol.SystemCallTarget_SystemCallBundle{
+							SystemCallBundle: &protocol.ContractCallBundle{
+								ContractId: resourcesKey.AddressBytes(),
+								EntryPoint: uint32(0x427a0394),
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			Op: &protocol.Operation_SetSystemCall{
+				SetSystemCall: &protocol.SetSystemCallOperation{
+					CallId: uint32(chain.SystemCallId_consume_block_resources),
+					Target: &protocol.SystemCallTarget{
+						Target: &protocol.SystemCallTarget_SystemCallBundle{
+							SystemCallBundle: &protocol.ContractCallBundle{
+								ContractId: resourcesKey.AddressBytes(),
+								EntryPoint: uint32(0x9850b1fd),
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	tx, err := CreateTransaction(client, overrides, genesisKey)
+	NoError(t, err)
+
+	_, err = CreateBlock(client, []*protocol.Transaction{tx}, genesisKey)
 	NoError(t, err)
 }
 

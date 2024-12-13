@@ -1,0 +1,144 @@
+networks:
+  p2p:
+    name: p2p
+  producer:
+    name: producer
+  api:
+    name: api
+
+services:
+  #producer
+  amqp_producer:
+    image: rabbitmq:alpine
+    networks:
+      - producer
+    configs:
+      - source: amqp-config
+        target: /etc/rabbitmq/rabbitmq.conf
+
+  chain_producer:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+    depends_on:
+      - amqp_producer
+    networks:
+      - producer
+    configs:
+      - source: genesis-data
+        target: /root/.koinos/chain/genesis_data.json
+    command: -a amqp://guest:guest@amqp_producer:5672/
+
+  mempool_producer:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
+    networks:
+      - producer
+    command: -a amqp://guest:guest@amqp_producer:5672/
+
+  block_store_producer:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
+    networks:
+      - producer
+    command: -a amqp://guest:guest@amqp_producer:5672/
+
+  p2p_producer:
+    image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
+    networks:
+      - p2p
+      - producer
+    command: -a amqp://guest:guest@amqp_producer:5672/ --force-gossip -s producer -L /ip4/0.0.0.0/tcp/8888
+
+  jsonrpc_producer:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
+    networks:
+      - producer
+    ports:
+      - "28080:8080"
+    configs:
+      - source: koinos-descriptors
+        target: /root/.koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    command: -a amqp://guest:guest@amqp_producer:5672/ -L /ip4/0.0.0.0/tcp/8080
+
+  block_producer:
+    image: koinos/koinos-block-producer:${BLOCK_PRODUCER_TAG:-latest}
+    depends_on:
+      - amqp_producer
+      - chain_producer
+    networks:
+      - producer
+    configs:
+      - source: pob-private-key
+        target: /root/.koinos/block_producer/private.key
+    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --gossip-production=false --resources-lower-bound=40 --resources-upper-bound=50
+
+  #api
+  amqp_api:
+    image: rabbitmq:alpine
+    networks:
+      - api
+    configs:
+      - source: amqp-config
+        target: /etc/rabbitmq/rabbitmq.conf
+
+  chain_api:
+    image: koinos/koinos-chain:${CHAIN_TAG:-latest}
+    depends_on:
+      - amqp_api
+    networks:
+      - api
+    configs:
+      - source: genesis-data
+        target: /root/.koinos/chain/genesis_data.json
+    command: -a amqp://guest:guest@amqp_api:5672/
+
+  mempool_api:
+    image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
+    depends_on:
+      - amqp_api
+      - chain_api
+    networks:
+      - api
+    command: -a amqp://guest:guest@amqp_api:5672/
+
+  block_store_api:
+    image: koinos/koinos-block-store:${BLOCK_STORE_TAG:-latest}
+    depends_on:
+      - amqp_api
+      - chain_api
+    networks:
+      - api
+    command: -a amqp://guest:guest@amqp_api:5672/
+
+  p2p_api:
+    image: koinos/koinos-p2p:${P2P_TAG:-latest}
+    depends_on:
+      - amqp_api
+      - chain_api
+    networks:
+      - p2p
+      - api
+    command: -a amqp://guest:guest@amqp_api:5672/ --force-gossip -s api -L /ip4/0.0.0.0/tcp/8888 -p /dns4/p2p_producer/tcp/8888/p2p/QmRT2UJ9uPqmcjCWoxgFZU3AsaMaMqmJ3DaEHeWZFLJp9L
+
+  jsonrpc_api:
+    image: koinos/koinos-jsonrpc:${JSONRPC_TAG:-latest}
+    depends_on:
+      - amqp_api
+      - chain_api
+    networks:
+      - api
+    ports:
+      - "28081:8080"
+    configs:
+      - source: koinos-descriptors
+        target: /koinos/jsonrpc/descriptors/koinos_descriptors.pb
+    command: --basedir=/koinos -a amqp://guest:guest@amqp_api:5672/ -L /tcp/8080
