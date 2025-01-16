@@ -159,6 +159,19 @@ func TestPublishTransaction(t *testing.T) {
 	}
 
 	for {
+		producerNonce, err := producer.GetPendingNonce(context.Background(), userKey.AddressBytes())
+		integration.NoError(t, err)
+
+		t.Logf("Producer Pending Nonce: %v\n", producerNonce)
+
+		if nonce == producerNonce {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
+
+	for {
 		producerNonce, err := producer.GetAccountNonce(context.Background(), userKey.AddressBytes())
 		integration.NoError(t, err)
 
