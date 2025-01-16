@@ -10,3 +10,6 @@ configs:
 
    pob-private-key:
       file: ./private.key
+
+   amqp-config:
+      file: ./rabbitmq.conf
