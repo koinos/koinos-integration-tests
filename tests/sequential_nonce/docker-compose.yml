@@ -25,7 +25,7 @@ services:
     configs:
       - source: genesis-data
         target: /root/.koinos/chain/genesis_data.json
-    command: -a amqp://guest:guest@amqp_producer:5672/
+    command: -a amqp://guest:guest@amqp_producer:5672/ --disable-pending-transaction-limit=true
 
   mempool_producer:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
@@ -99,7 +99,7 @@ services:
     configs:
       - source: genesis-data
         target: /root/.koinos/chain/genesis_data.json
-    command: -a amqp://guest:guest@amqp_api:5672/
+    command: -a amqp://guest:guest@amqp_api:5672/ --disable-pending-transaction-limit=true
 
   mempool_api:
     image: koinos/koinos-mempool:${MEMPOOL_TAG:-latest}
