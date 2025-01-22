@@ -79,7 +79,7 @@ services:
     configs:
       - source: pob-private-key
         target: /root/.koinos/block_producer/private.key
-    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --gossip-production=false --resources-lower-bound=40 --resources-upper-bound=50
+    command: -a amqp://guest:guest@amqp_producer:5672/ --algorithm=federated --gossip-production=false
 
   #api
   amqp_api:
