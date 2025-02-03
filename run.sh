@@ -8,6 +8,7 @@ function run_test() {
    TEST_NAME=`basename \`pwd\``
    COMPOSE_COMMAND="docker compose -p $TEST_NAME -f ../../node_config/docker-compose.config.yml -f docker-compose.yml"
 
+   which go
    go build ./...
    if [ $? -ne 0 ];
    then
@@ -28,6 +29,7 @@ function run_test() {
       return $code
    fi
 
+   which go
    go clean -testcache
    go test -timeout 30m -v ./...
    if [ $? -ne 0 ];
